@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import json
 import os
@@ -30,7 +31,7 @@ def calculate_cow(row):
     
     if days <= 0 or weight <= birth_weight:
         return pd.Series([0.0, 0, 0, 0.0, 0.0, 0, 0], 
-                        index=["DG", "育成日数", "育成コスト(千円)", "予測出荷体重", "予測枝肉重量", "見込売上(千円)", "上限価格(千円)"])
+                         index=["DG", "育成日数", "育成コスト(千円)", "予測出荷体重", "予測枝肉重量", "見込売上(千円)", "上限価格(千円)"])
     
     dg = (weight - birth_weight) / days
     raising_days = max(0, shipment_days - days)
@@ -119,7 +120,6 @@ with st.expander("📷 名簿ファイル（写真 / PDF）の自動読み取り
                 if "実際落札額(千円)" not in df_new.columns:
                     df_new["実際落札額(千円)"] = 0
                 
-                # 並び順を「No」「体重」を先頭に整理
                 df_new = df_new[["No", "体重", "性別", "日齢", "父", "実際落札額(千円)"]]
                 st.session_state.cows_df = df_new
                 st.session_state.current_no_idx = 0
@@ -135,13 +135,13 @@ df = st.session_state.cows_df
 total_cows = len(df)
 
 if total_cows > 0:
-    # 選択中の牛のインデックス制御
     idx = st.session_state.current_no_idx
     if idx >= total_cows:
         idx = total_cows - 1
         st.session_state.current_no_idx = idx
 
     current_cow = df.iloc[idx]
+    current_w = float(current_cow["体重"])
     
     # 対象牛の情報を大きく表示
     col_nav1, col_nav2 = st.columns([1, 1])
@@ -154,9 +154,11 @@ if total_cows > 0:
     with st.form(key=f"quick_input_form_{idx}"):
         input_w = st.number_input(
             "当日体重 (kg)", 
-            value=float(current_cow["体重"]) if float(current_cow["体重"]) > 0 else 280.0, 
+            value=current_w if current_w > 0 else None, 
             step=1.0,
-            format="%.1f"
+            format="%.1f",
+            placeholder="タップして体重を入力 (例: 295)",
+            key=f"weight_input_{idx}"
         )
         
         col_btn1, col_btn2 = st.columns(2)
@@ -166,7 +168,8 @@ if total_cows > 0:
             prev_btn = st.form_submit_button("⬅️ 前の牛に戻る", use_container_width=True)
 
         if submit_next:
-            st.session_state.cows_df.at[idx, "体重"] = input_w
+            if input_w is not None:
+                st.session_state.cows_df.at[idx, "体重"] = float(input_w)
             if idx + 1 < total_cows:
                 st.session_state.current_no_idx = idx + 1
             st.rerun()
@@ -176,12 +179,29 @@ if total_cows > 0:
                 st.session_state.current_no_idx = idx - 1
             st.rerun()
 
+    # 自動フォーカス（次の牛に進んだ際に入力欄を自動選択してキーボードを開く）
+    components.html(
+        """
+        <script>
+        setTimeout(function() {
+            var inputs = window.parent.document.querySelectorAll('input[type="number"]');
+            if (inputs.length > 0) {
+                // 下見モードの体重入力欄（最後のinput）にフォーカス
+                inputs[inputs.length - 1].focus();
+                inputs[inputs.length - 1].select();
+            }
+        }, 150);
+        </script>
+        """,
+        height=0,
+        width=0
+    )
+
 st.divider()
 
 # --- 3. 一覧表エディタ & 判定結果 ---
 st.subheader("📊 セリ一覧表 & 上限価格判定")
 
-# No と 体重 を先頭に配置
 edited_df = st.data_editor(
     st.session_state.cows_df,
     num_rows="dynamic",
@@ -212,7 +232,7 @@ def judge(row):
 
 result_df["判定"] = result_df.apply(judge, axis=1)
 
-# セリ本番用ビュー（体重が入力されている牛を上位表示）
+# セリ本番用ビュー
 st.dataframe(
     result_df[[
         "No", "上限価格(千円)", "判定", "体重", "DG", 
