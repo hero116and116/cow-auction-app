@@ -3,14 +3,21 @@ import streamlit.components.v1 as components
 import pandas as pd
 import json
 import os
+import requests
 from google import genai
 from google.genai import types
 
-st.set_page_config(page_title="牛セリ適正価格チェッカー", layout="wide")
+st.set_page_config(page_title="牛セリ適正価格チェッカー", page_icon="🐄", layout="wide")
 st.title("🐄 牛セリ落札上限価格シミュレーター")
 
 # --- APIキーの設定 ---
 GEMINI_API_KEY = "AQ.Ab8RN6KGaI97aQ0liR_8kYw5ALr-SMS8KzDW8cPaMUnlt4veDQ"
+
+# --- kintone接続設定 ---
+KINTONE_DOMAIN = "cattlook.cybozu.com"
+KINTONE_APP_ID = "131"
+# ↓ 発行したAPIトークン
+KINTONE_API_TOKEN = "T4aTJyzRN736eaqzzWucxZIIbXy9wYn5YkAnlJsO"
 
 # --- サイドバー：共通設定パラメータ ---
 with st.sidebar:
@@ -89,6 +96,43 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
     )
     return json.loads(response.text)
 
+# --- kintone一括保存関数 ---
+def send_to_kintone(df):
+    url = f"https://{KINTONE_DOMAIN}/k/v1/records.json"
+    headers = {
+        "X-Cybozu-API-Token": KINTONE_API_TOKEN,
+        "Content-Type": "application/json"
+    }
+    
+    records = []
+    for _, row in df.iterrows():
+        # 体重が入力されているデータのみ保存
+        if float(row.get("体重", 0)) > 0:
+            records.append({
+                "出場No": {"value": int(row["No"])},
+                "当日体重": {"value": float(row["体重"])},
+                "日齢": {"value": int(row["日齢"])},
+                "性別": {"value": str(row["性別"])},
+                "父牛": {"value": str(row["父"])},
+            })
+            
+    if not records:
+        return False, "保存対象のデータ（体重入力済み）がありません。"
+        
+    payload = {
+        "app": KINTONE_APP_ID,
+        "records": records
+    }
+    
+    try:
+        res = requests.post(url, headers=headers, json=payload)
+        if res.status_code == 200:
+            return True, f"✅ {len(records)} 頭のデータをkintoneに保存しました！"
+        else:
+            return False, f"❌ 送信エラー ({res.status_code}): {res.text}"
+    except Exception as e:
+        return False, f"❌ 通信エラー: {str(e)}"
+
 # --- セッションステート初期化 ---
 if "cows_df" not in st.session_state:
     st.session_state.cows_df = pd.DataFrame([
@@ -143,14 +187,12 @@ if total_cows > 0:
     current_cow = df.iloc[idx]
     current_w = float(current_cow["体重"])
     
-    # 対象牛の情報を大きく表示
     col_nav1, col_nav2 = st.columns([1, 1])
     with col_nav1:
         st.markdown(f"### 🐂 **No. {int(current_cow['No'])}** ({idx + 1}/{total_cows}頭目)")
     with col_nav2:
         st.markdown(f"**性別**: {current_cow['性別']} ｜ **日齢**: {int(current_cow['日齢'])}日 ｜ **父**: {current_cow['父']}")
 
-    # 入力フォーム
     with st.form(key=f"quick_input_form_{idx}"):
         input_w = st.number_input(
             "当日体重 (kg)", 
@@ -179,14 +221,12 @@ if total_cows > 0:
                 st.session_state.current_no_idx = idx - 1
             st.rerun()
 
-    # 自動フォーカス（次の牛に進んだ際に入力欄を自動選択してキーボードを開く）
     components.html(
         """
         <script>
         setTimeout(function() {
             var inputs = window.parent.document.querySelectorAll('input[type="number"]');
             if (inputs.length > 0) {
-                // 下見モードの体重入力欄（最後のinput）にフォーカス
                 inputs[inputs.length - 1].focus();
                 inputs[inputs.length - 1].select();
             }
@@ -232,12 +272,23 @@ def judge(row):
 
 result_df["判定"] = result_df.apply(judge, axis=1)
 
-# セリ本番用ビュー
 st.dataframe(
     result_df[[
         "No", "上限価格(千円)", "判定", "体重", "DG", 
         "実際落札額(千円)", "見込売上(千円)", "育成コスト(千円)", "父", "日齢"
     ]],
     use_container_width=True,
-    height=350
+    height=300
 )
+
+st.divider()
+
+# --- 4. kintoneへ一括送信ボタン ---
+st.subheader("☁️ 牧場データ連携")
+if st.button("📤 セリ結果をkintoneに一括保存する", type="primary", use_container_width=True):
+    with st.spinner("kintoneにデータを送信中..."):
+        success, msg = send_to_kintone(result_df)
+        if success:
+            st.success(msg)
+        else:
+            st.error(msg)
