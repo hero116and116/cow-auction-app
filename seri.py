@@ -16,7 +16,6 @@ GEMINI_API_KEY = "AQ.Ab8RN6KGaI97aQ0liR_8kYw5ALr-SMS8KzDW8cPaMUnlt4veDQ"
 # --- kintone接続設定 ---
 KINTONE_DOMAIN = "cattlook.cybozu.com"
 KINTONE_APP_ID = "131"
-# ↓ 発行したAPIトークン
 KINTONE_API_TOKEN = "T4aTJyzRN736eaqzzWucxZIIbXy9wYn5YkAnlJsO"
 
 # --- サイドバー：共通設定パラメータ ---
@@ -59,7 +58,7 @@ def calculate_cow(row):
         limit_price // 1000
     ], index=["DG", "育成日数", "育成コスト(千円)", "予測出荷体重", "予測枝肉重量", "見込売上(千円)", "上限価格(千円)"])
 
-# --- AI画像/PDF解析関数 ---
+# --- AI画像/PDF解析関数（kintoneの項目に完全対応） ---
 def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
     client = genai.Client(api_key=key)
     file_bytes = uploaded_file.getvalue()
@@ -73,15 +72,20 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
         mime_type = "image/jpeg"
 
     prompt = """
-    添付された牛のセリ名簿のデータから、各行の情報を抽出し、以下のキーを持つJSON配列として出力してください。
+    添付された牛のセリ名簿データから各牛の情報を抽出し、以下のキーを持つJSON配列として出力してください。
     - No: 出場番号 (整数)
     - 性別: 性別 (去 / 雌)
     - 日齢: 日齢 (整数)
+    - 産次: 産次 (整数、記載がなければ 0)
+    - 摘要: 摘要 (文字列、記載がなければ "")
     - 父: 血統の「父」の名前 (文字列)
+    - 母の父: 血統の「母の父母」または「母の父」の名前 (文字列)
+    - 母の祖父: 血統の「の祖父母」または「母の祖父」の名前 (文字列)
+    - 母の母の祖父: 血統の「の母の祖父」の名前 (文字列)
 
-    ※ 体重は当日に記入されるため 0 としてください。
+    ※ 体重は 0 としてください。
     ※ 実際落札額(千円)は 0 としてください。
-    ※ 余計な文章は一切出力せず、JSON配列のみを返してください。
+    ※ 余計な文章は出力せず、JSON配列のみを返してください。
     """
 
     response = client.models.generate_content(
@@ -106,18 +110,31 @@ def send_to_kintone(df):
     
     records = []
     for _, row in df.iterrows():
-        # 体重が入力されているデータのみ保存
-        if float(row.get("体重", 0)) > 0:
+        weight = float(row.get("体重", 0))
+        actual_price = int(row.get("実際落札額(千円)", 0))
+        is_purchased = bool(row.get("自社落札", False))
+        
+        # 体重または落札額が入力されている牛を保存
+        if weight > 0 or actual_price > 0:
+            status = "購入" if is_purchased else "非購入"
             records.append({
-                "出場No": {"value": int(row["No"])},
-                "当日体重": {"value": float(row["体重"])},
-                "日齢": {"value": int(row["日齢"])},
-                "性別": {"value": str(row["性別"])},
-                "父牛": {"value": str(row["父"])},
+                "出場番号": {"value": int(row["No"])},
+                "当日体重(kg)": {"value": weight},
+                "日齢": {"value": int(row.get("日齢", 0))},
+                "産次": {"value": int(row.get("産次", 0))},
+                "摘要": {"value": str(row.get("摘要", ""))},
+                "性別": {"value": str(row.get("性別", "去"))},
+                "父": {"value": str(row.get("父", ""))},
+                "母の父": {"value": str(row.get("母の父", ""))},
+                "母の祖父": {"value": str(row.get("母の祖父", ""))},
+                "母の母の祖父": {"value": str(row.get("母の母の祖父", ""))},
+                "落札上限価格(千円)": {"value": int(row.get("上限価格(千円)", 0))},
+                "実際落札額(千円)": {"value": actual_price},
+                "購入結果": {"value": status},
             })
             
     if not records:
-        return False, "保存対象のデータ（体重入力済み）がありません。"
+        return False, "保存対象のデータがありません（体重または実際落札額を入力してください）。"
         
     payload = {
         "app": KINTONE_APP_ID,
@@ -136,7 +153,11 @@ def send_to_kintone(df):
 # --- セッションステート初期化 ---
 if "cows_df" not in st.session_state:
     st.session_state.cows_df = pd.DataFrame([
-        {"No": i, "体重": 0.0, "性別": "去", "日齢": 280, "父": "-", "実際落札額(千円)": 0}
+        {
+            "No": i, "体重": 0.0, "性別": "去", "日齢": 280, "産次": 0, "摘要": "",
+            "父": "-", "母の父": "-", "母の祖父": "-", "母の母の祖父": "-",
+            "実際落札額(千円)": 0, "自社落札": False
+        }
         for i in range(1, 31)
     ])
 
@@ -152,22 +173,28 @@ with st.expander("📷 名簿ファイル（写真 / PDF）の自動読み取り
     )
     if uploaded_files and st.button("🚀 AIで名簿を解析して表に展開"):
         all_parsed_rows = []
-        with st.spinner("AIが名簿を解析中..."):
+        with st.spinner("AIが名簿を詳細解析中..."):
             for f in uploaded_files:
                 parsed_data = parse_catalog_file(f)
                 all_parsed_rows.extend(parsed_data)
             
             if all_parsed_rows:
                 df_new = pd.DataFrame(all_parsed_rows)
-                if "体重" not in df_new.columns:
-                    df_new["体重"] = 0.0
-                if "実際落札額(千円)" not in df_new.columns:
-                    df_new["実際落札額(千円)"] = 0
+                for col, default_val in [
+                    ("体重", 0.0), ("実際落札額(千円)", 0), ("自社落札", False),
+                    ("産次", 0), ("摘要", ""), ("父", "-"), ("母の父", "-"), 
+                    ("母の祖父", "-"), ("母の母の祖父", "-")
+                ]:
+                    if col not in df_new.columns:
+                        df_new[col] = default_val
                 
-                df_new = df_new[["No", "体重", "性別", "日齢", "父", "実際落札額(千円)"]]
-                st.session_state.cows_df = df_new
+                cols_order = [
+                    "No", "体重", "性別", "日齢", "産次", "父", "母の父", 
+                    "母の祖父", "母の母の祖父", "摘要", "実際落札額(千円)", "自社落札"
+                ]
+                st.session_state.cows_df = df_new[cols_order]
                 st.session_state.current_no_idx = 0
-                st.success(f"合計 {len(df_new)} 頭分の名簿データを登録しました！")
+                st.success(f"合計 {len(df_new)} 頭分の詳細データを展開しました！")
                 st.rerun()
 
 st.divider()
@@ -191,7 +218,10 @@ if total_cows > 0:
     with col_nav1:
         st.markdown(f"### 🐂 **No. {int(current_cow['No'])}** ({idx + 1}/{total_cows}頭目)")
     with col_nav2:
-        st.markdown(f"**性別**: {current_cow['性別']} ｜ **日齢**: {int(current_cow['日齢'])}日 ｜ **父**: {current_cow['父']}")
+        st.markdown(
+            f"**性別**: {current_cow['性別']} ｜ **日齢**: {int(current_cow['日齢'])}日 ｜ **産次**: {int(current_cow['産次'])}\n\n"
+            f"**父**: {current_cow['父']} ｜ **母父**: {current_cow['母の父']}"
+        )
 
     with st.form(key=f"quick_input_form_{idx}"):
         input_w = st.number_input(
@@ -249,11 +279,17 @@ edited_df = st.data_editor(
     height=280,
     column_config={
         "No": st.column_config.NumberColumn("No", format="%d", width="small"),
-        "体重": st.column_config.NumberColumn("当日体重(kg)", format="%.1f", width="medium"),
+        "体重": st.column_config.NumberColumn("当日体重(kg)", format="%.1f", width="small"),
         "性別": st.column_config.TextColumn("性別", width="small"),
         "日齢": st.column_config.NumberColumn("日齢", format="%d", width="small"),
-        "父": st.column_config.TextColumn("父", width="medium"),
+        "産次": st.column_config.NumberColumn("産次", format="%d", width="small"),
+        "父": st.column_config.TextColumn("父", width="small"),
+        "母の父": st.column_config.TextColumn("母の父", width="small"),
+        "母の祖父": st.column_config.TextColumn("母の祖父", width="small"),
+        "母の母の祖父": st.column_config.TextColumn("母の母の祖父", width="small"),
+        "摘要": st.column_config.TextColumn("摘要", width="medium"),
         "実際落札額(千円)": st.column_config.NumberColumn("実落札(千円)", format="%d", width="medium"),
+        "自社落札": st.column_config.CheckboxColumn("自社落札?", default=False, width="small"),
     }
 )
 st.session_state.cows_df = edited_df
@@ -274,11 +310,11 @@ result_df["判定"] = result_df.apply(judge, axis=1)
 
 st.dataframe(
     result_df[[
-        "No", "上限価格(千円)", "判定", "体重", "DG", 
-        "実際落札額(千円)", "見込売上(千円)", "育成コスト(千円)", "父", "日齢"
+        "No", "自社落札", "上限価格(千円)", "実際落札額(千円)", "判定", 
+        "体重", "DG", "見込売上(千円)", "父", "母の父", "日齢"
     ]],
     use_container_width=True,
-    height=300
+    height=320
 )
 
 st.divider()
@@ -286,7 +322,7 @@ st.divider()
 # --- 4. kintoneへ一括送信ボタン ---
 st.subheader("☁️ 牧場データ連携")
 if st.button("📤 セリ結果をkintoneに一括保存する", type="primary", use_container_width=True):
-    with st.spinner("kintoneにデータを送信中..."):
+    with st.spinner("kintoneに詳細データを送信中..."):
         success, msg = send_to_kintone(result_df)
         if success:
             st.success(msg)
