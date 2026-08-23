@@ -15,6 +15,14 @@ st.markdown("""
     /* 全体フォント・余白調整 */
     .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 480px; }
 
+    /* タブバーが画面上部の固定ツールバーと重なって見づらくなる問題を解消
+       （sticky指定を外し、背景を不透明にして通常のスクロール要素にする） */
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        position: static !important;
+        background-color: #ffffff !important;
+    }
+    div[data-testid="stTabs"] { position: static !important; }
+
     /* 画面全体を囲む1枚のカード（モックアップの外枠） */
     .screen-card {
         border: 2px solid #1e293b;
@@ -82,8 +90,12 @@ st.markdown("""
         border-bottom: 2px solid #1e293b;
         display: inline-block;
         min-width: 160px;
+        height: 40px;
+        line-height: 40px;
         padding: 2px 6px;
         text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
     }
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
@@ -146,8 +158,8 @@ st.markdown("""
     }
     .st-key-numpad_area_w button,
     .st-key-numpad_area_p button {
-        height: 52px !important;
-        font-size: 18px !important;
+        height: 72px !important;
+        font-size: 26px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
         border: 1px solid #94a3b8 !important;
@@ -173,7 +185,7 @@ st.markdown("""
     /* 左右ナビゲーションボタン（縦長・モックアップの矢印ボタン） */
     .st-key-prev_w button, .st-key-next_w button,
     .st-key-prev_p button, .st-key-next_p button {
-        height: 176px !important;
+        height: 300px !important;
         font-size: 22px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
@@ -325,6 +337,11 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # =========================================================
 with tab1:
     st.subheader("📄 セリ名簿の自動読み取り")
+
+    if st.session_state.get("just_parsed_count"):
+        st.success(f"✅ 読み取りが完了しました！（{st.session_state.just_parsed_count}頭のデータを読み込みました）")
+        st.session_state.just_parsed_count = 0
+
     uploaded = st.file_uploader("名簿ファイルまたは写真を選択", type=["pdf", "png", "jpg", "jpeg"])
     if uploaded and st.button("🚀 自動読み取り開始", type="primary", use_container_width=True):
         with st.spinner("AIが名簿を解析中..."):
@@ -337,13 +354,15 @@ with tab1:
                 st.session_state.cows = parsed
                 st.session_state.curr_idx = 0
                 st.session_state.input_buffer = ""
-                st.success(f"✅ {len(parsed)} 頭の名簿データを読み込みました！")
+                st.session_state.just_parsed_count = len(parsed)
+                st.toast("読み取りが完了しました！", icon="✅")
                 st.rerun()
 
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
-with tab2:
+@st.fragment
+def render_weight_tab():
     total = len(st.session_state.cows)
     idx = st.session_state.curr_idx
     cow = st.session_state.cows[idx]
@@ -412,10 +431,14 @@ with tab2:
                 st.session_state.input_buffer = ""
                 st.rerun()
 
+
+with tab2:
+    render_weight_tab()
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
-with tab3:
+@st.fragment
+def render_price_tab():
     total = len(st.session_state.cows)
     idx = st.session_state.curr_idx
     cow = st.session_state.cows[idx]
@@ -498,6 +521,9 @@ with tab3:
                 st.session_state.input_buffer = ""
                 st.rerun()
 
+
+with tab3:
+    render_price_tab()
 # =========================================================
 # 画面4: セリ結果一覧表示画面
 # =========================================================
