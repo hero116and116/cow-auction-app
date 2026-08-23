@@ -41,10 +41,10 @@ st.markdown("""
         background-color: #ffffff;
     }
     .card-top {
-        padding: 16px 16px 14px 16px;
+        padding: 20px 18px 16px 18px;
         text-align: center;
         position: relative;
-        min-height: 290px;
+        min-height: 300px;
         box-sizing: border-box;
     }
     .card-divider {
@@ -52,22 +52,22 @@ st.markdown("""
         margin: 0;
     }
     .card-bottom {
-        padding: 14px 10px 16px 10px;
+        padding: 16px 14px 18px 14px;
     }
 
     .cow-no-label {
-        font-size: 18px;
-        font-weight: 800;
-        color: #1e293b;
-        margin-bottom: 2px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 4px;
     }
 
     .cow-icon-container {
         position: relative;
         display: inline-block;
         width: 170px;
-        height: 105px;
-        margin: 2px 0;
+        height: 110px;
+        margin: 4px 0;
     }
     .cow-img {
         width: 100%;
@@ -90,7 +90,7 @@ st.markdown("""
         align-items: baseline;
         justify-content: center;
         gap: 8px;
-        margin-top: 8px;
+        margin-top: 10px;
     }
     .input-display {
         font-size: 32px;
@@ -109,23 +109,22 @@ st.markdown("""
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
     .cow-meta {
-        margin-top: 8px;
-        color: #334155;
+        margin-top: 10px;
+        color: #475569;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.6;
         text-align: left;
         display: inline-block;
-        width: 100%;
     }
     .cow-metrics {
-        margin-top: 6px;
+        margin-top: 8px;
         font-size: 14px;
         font-weight: 700;
         color: #0f172a;
         text-align: left;
     }
-    .cow-metrics .profit { color: #059669; font-size: 16px; }
-    .cow-metrics .border-price { color: #2563eb; font-size: 17px; }
+    .cow-metrics .profit { color: #059669; font-size: 15px; }
+    .cow-metrics .border-price { color: #2563eb; font-size: 16px; }
 
     .badge-monensin {
         background-color: #fee2e2;
@@ -139,13 +138,12 @@ st.markdown("""
         margin-left: 6px;
     }
 
-    /* テンキーエリア */
     .st-key-numpad_area_w, .st-key-numpad_area_p {
         border: 2px solid #1e293b;
         border-top: none;
         border-radius: 0 0 4px 4px;
         margin-top: -16px;
-        padding: 12px 6px 16px 6px;
+        padding: 14px 10px 16px 10px;
         background-color: #ffffff;
     }
 
@@ -153,7 +151,7 @@ st.markdown("""
     .st-key-numpad_area_p div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 6px !important;
+        gap: 4px !important;
     }
     .st-key-numpad_area_w div[data-testid="stColumn"],
     .st-key-numpad_area_p div[data-testid="stColumn"],
@@ -161,11 +159,12 @@ st.markdown("""
     .st-key-numpad_area_p div[data-testid="column"] {
         width: auto !important;
         min-width: 0 !important;
+        flex: 1 1 0 !important;
     }
     .st-key-numpad_area_w button,
     .st-key-numpad_area_p button {
         height: 72px !important;
-        font-size: 28px !important;
+        font-size: 26px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
         border: 1px solid #94a3b8 !important;
@@ -180,7 +179,6 @@ st.markdown("""
         background-color: #3b82f6 !important;
         color: #ffffff !important;
         border-color: #3b82f6 !important;
-        font-size: 20px !important;
     }
     .st-key-btn_w_c button, .st-key-btn_p_c button {
         background-color: #f1f5f9 !important;
@@ -196,6 +194,7 @@ st.markdown("""
         border: 1px solid #94a3b8 !important;
         background-color: #ffffff !important;
         color: #1e293b !important;
+        margin-top: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -307,10 +306,8 @@ if "cows" not in st.session_state:
         {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "M" if i % 3 == 0 else "", "自社落札": False}
         for i in range(1, 31)
     ]
-if "curr_idx_w" not in st.session_state:
-    st.session_state.curr_idx_w = 0
-if "curr_idx_p" not in st.session_state:
-    st.session_state.curr_idx_p = 0
+if "curr_idx" not in st.session_state:
+    st.session_state.curr_idx = 0
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
 
@@ -348,8 +345,7 @@ with tab1:
                     r["実際落札額"] = 0
                     r["自社落札"] = False
                 st.session_state.cows = parsed
-                st.session_state.curr_idx_w = 0
-                st.session_state.curr_idx_p = 0
+                st.session_state.curr_idx = 0
                 st.session_state.input_buffer = ""
                 st.session_state.just_parsed_count = len(parsed)
                 st.toast("読み取りが完了しました！", icon="✅")
@@ -361,7 +357,7 @@ with tab1:
 @st.fragment
 def render_weight_tab():
     total = len(st.session_state.cows)
-    idx = st.session_state.curr_idx_w
+    idx = st.session_state.curr_idx
     cow = st.session_state.cows[idx]
     
     display_w = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["体重"]) if cow["体重"] > 0 else "")
@@ -385,15 +381,14 @@ def render_weight_tab():
     )
     st.markdown(card_html_w, unsafe_allow_html=True)
 
-    # テンキー横幅拡大：比率を[0.6, 5.0, 0.6]に調整
     with st.container(key="numpad_area_w"):
-        col_l, col_pad, col_r = st.columns([0.6, 5.0, 0.6])
+        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
 
         with col_l:
             if st.button("←", key="prev_w", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx_w = max(0, idx - 1)
+                st.session_state.curr_idx = max(0, idx - 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -401,7 +396,7 @@ def render_weight_tab():
             if st.button("→", key="next_w", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx_w = min(total - 1, idx + 1)
+                st.session_state.curr_idx = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -423,7 +418,7 @@ def render_weight_tab():
             if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx_w = min(total - 1, idx + 1)
+                st.session_state.curr_idx = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -436,7 +431,7 @@ with tab2:
 @st.fragment
 def render_price_tab():
     total = len(st.session_state.cows)
-    idx = st.session_state.curr_idx_p
+    idx = st.session_state.curr_idx
     cow = st.session_state.cows[idx]
     calc = calculate_cow_metrics(cow)
     
@@ -450,9 +445,9 @@ def render_price_tab():
     elif bikou_str:
         bikou_html = f'<span style="background-color:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:12px; margin-left:6px;">{bikou_str}</span>'
 
-    col_title, col_check = st.columns([3.5, 1.5])
+    col_title, col_check = st.columns([4, 1])
     with col_title:
-        st.markdown(f"<div class='cow-no-label' style='margin-top:4px;'>No.{cow['No']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='cow-no-label' style='margin-top:6px;'>No.{cow['No']}</div>", unsafe_allow_html=True)
     with col_check:
         purchased = st.checkbox("購入チェック", value=cow["自社落札"], key=f"buy_check_{idx}")
         st.session_state.cows[idx]["自社落札"] = purchased
@@ -462,7 +457,9 @@ def render_price_tab():
         '<div class="card-top">'
         f'{get_cow_svg(cow["No"])}'
         '<div class="cow-meta">'
-        f'日齢: <b>{cow["日齢"]}日</b> ｜ 体重: <b>{cow["体重"]}kg</b> ｜ 父: <b>{cow["父"]}</b><br>'
+        f'日齢: <b>{cow["日齢"]}日</b><br>'
+        f'体重: <b>{cow["体重"]}kg</b><br>'
+        f'父: <b>{cow["父"]}</b><br>'
         f'摘要: {bikou_html if bikou_html else "<b>-</b>"}'
         '</div>'
         '<div class="cow-metrics">'
@@ -480,15 +477,14 @@ def render_price_tab():
     )
     st.markdown(card_html_p, unsafe_allow_html=True)
 
-    # テンキー横幅拡大：比率を[0.6, 5.0, 0.6]に調整
     with st.container(key="numpad_area_p"):
-        col_l, col_pad, col_r = st.columns([0.6, 5.0, 0.6])
+        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
 
         with col_l:
             if st.button("←", key="prev_p", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx_p = max(0, idx - 1)
+                st.session_state.curr_idx = max(0, idx - 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -496,7 +492,7 @@ def render_price_tab():
             if st.button("→", key="next_p", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx_p = min(total - 1, idx + 1)
+                st.session_state.curr_idx = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -518,7 +514,7 @@ def render_price_tab():
             if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx_p = min(total - 1, idx + 1)
+                st.session_state.curr_idx = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
