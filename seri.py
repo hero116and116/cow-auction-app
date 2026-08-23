@@ -252,13 +252,20 @@ st.markdown("""
         color: #1e293b !important;
         margin-top: 0 !important;
     }
-    header[data-testid="stHeader"],
+    /* Fork・GitHubアイコン・右上の3点メニューだけをピンポイントで非表示 */
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] .stAppToolbar,
     [data-testid="stStatusWidget"],
     [data-testid="stDecoration"],
     footer,
     div[class*="viewerBadge"],
     iframe[title*="streamlit"] {
         display: none !important;
+    }
+
+    /* ヘッダー自体の背景を透明にしてコンテンツと重ならないように調整 */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
     }
 </style>
 """, unsafe_allow_html=True)
