@@ -8,27 +8,48 @@ from google.genai import types
 
 st.set_page_config(page_title="牛セリ適正価格チェッカー", page_icon="🐄", layout="centered")
 
-# --- カスタムCSS（専用テンキー・牛カードデザイン） ---
+# --- カスタムCSS（専用テンキー・牛カードデザイン／モックアップ準拠） ---
 st.markdown("""
 <style>
     /* 全体フォント・余白調整 */
-    .block-container { padding-top: 1.5rem; padding-bottom: 3rem; }
-    
-    /* 牛のシルエットカード */
-    .cow-card {
-        background-color: #f8fafc;
-        border: 2px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 18px;
+    .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 480px; }
+
+    /* 画面全体を囲む1枚のカード（モックアップの外枠） */
+    .screen-card {
+        border: 2px solid #1e293b;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        overflow: hidden;
+        background-color: #ffffff;
+    }
+    .card-top {
+        padding: 20px 18px 16px 18px;
         text-align: center;
-        margin-bottom: 12px;
         position: relative;
     }
+    .card-divider {
+        border-top: 2px solid #1e293b;
+        margin: 0;
+    }
+    .card-bottom {
+        padding: 16px 14px 18px 14px;
+    }
+
+    /* 出場番号バッジ */
+    .cow-no-label {
+        font-size: 16px;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+
+    /* 牛のシルエット */
     .cow-icon-container {
         position: relative;
         display: inline-block;
-        width: 140px;
-        height: 90px;
+        width: 150px;
+        height: 95px;
+        margin: 4px 0;
     }
     .cow-svg {
         width: 100%;
@@ -44,31 +65,92 @@ st.markdown("""
         font-size: 26px;
         font-weight: 900;
     }
+
+    /* 体重・落札額の大きな入力表示（下線スタイル） */
+    .input-display-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+    }
     .input-display {
         font-size: 32px;
         font-weight: 800;
         color: #1e293b;
-        border-bottom: 3px solid #3b82f6;
+        border-bottom: 2px solid #1e293b;
         display: inline-block;
-        min-width: 140px;
-        padding: 2px 10px;
-        margin-top: 6px;
+        min-width: 160px;
+        padding: 2px 6px;
+        text-align: right;
     }
-    .status-badge {
-        font-size: 15px;
+    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
+
+    .cow-meta {
+        margin-top: 10px;
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.6;
+        text-align: left;
+        display: inline-block;
+    }
+    .cow-metrics {
+        margin-top: 8px;
+        font-size: 14px;
         font-weight: 700;
-        padding: 4px 10px;
-        border-radius: 8px;
-        display: inline-block;
-        margin-top: 4px;
+        color: #0f172a;
+        text-align: left;
     }
-    
-    /* テンキー・ナビゲーションボタン */
-    div[data-testid="stHorizontalBlock"] button {
-        height: 56px !important;
+    .cow-metrics .profit { color: #059669; font-size: 15px; }
+    .cow-metrics .border-price { color: #2563eb; font-size: 16px; }
+
+    /* 購入チェック（右上の小さな四角） */
+    .purchase-check-label {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #334155;
+        text-align: center;
+    }
+
+    /* --- テンキー行のレイアウト --- */
+    .numpad-area div[data-testid="stHorizontalBlock"] { gap: 4px !important; }
+    .numpad-area button {
+        height: 58px !important;
         font-size: 20px !important;
         font-weight: 700 !important;
-        border-radius: 12px !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+    }
+    .numpad-area button:hover { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+
+    /* 決定ボタンだけ強調 */
+    .st-key-btn_w_enter button, .st-key-btn_p_enter button {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+        border-color: #3b82f6 !important;
+    }
+    /* クリアボタン */
+    .st-key-btn_w_c button, .st-key-btn_p_c button {
+        background-color: #f1f5f9 !important;
+        color: #dc2626 !important;
+    }
+
+    /* 左右ナビゲーションボタン（縦長・モックアップの矢印ボタン） */
+    .st-key-prev_w button, .st-key-next_w button,
+    .st-key-prev_p button, .st-key-next_p button {
+        height: 196px !important;
+        font-size: 24px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        margin-top: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -237,43 +319,47 @@ with tab2:
     idx = st.session_state.curr_idx
     cow = st.session_state.cows[idx]
     
-    # 1. 上部：牛シルエット＆No
-    display_w = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["体重"]) if cow["体重"] > 0 else "___")
-    
+    # 1. 上部：牛シルエット＆No（モックアップの「体重入力画面」上段）
+    display_w = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["体重"]) if cow["体重"] > 0 else "")
+
     st.markdown(f"""
-    <div class="cow-card">
-        <h3 style="margin:0; color:#64748b;">No. {cow['No']}</h3>
-        {get_cow_svg(cow['No'])}
-        <div><span class="input-display">{display_w}</span> <span style="font-size:20px; font-weight:700;">kg</span></div>
-        <div style="margin-top:8px; color:#475569; font-size:14px;">
-            性別: <b>{cow['性別']}</b> ｜ 日齢: <b>{cow['日齢']}日</b> ｜ 父: <b>{cow['父']}</b>
+    <div class="screen-card">
+        <div class="card-top">
+            <div class="cow-no-label">No.{cow['No']}</div>
+            {get_cow_svg(cow['No'])}
+            <div class="input-display-row">
+                <span class="input-display">{display_w}</span>
+                <span class="input-unit">kg</span>
+            </div>
+            <div class="cow-meta">
+                性別: <b>{cow['性別']}</b> ｜ 日齢: <b>{cow['日齢']}日</b> ｜ 父: <b>{cow['父']}</b>
+            </div>
         </div>
+        <div class="card-divider"></div>
+        <div class="card-bottom" id="numpad-anchor-w"></div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # 2. テンキー & 左右移動ボタン
-    col_l, col_pad, col_r = st.columns([1.2, 3.6, 1.2])
-    
+
+    # 2. テンキー & 左右移動ボタン（カード下段を模したグリッド）
+    st.markdown('<div class="numpad-area">', unsafe_allow_html=True)
+    col_l, col_pad, col_r = st.columns([1.1, 3.8, 1.1])
+
     with col_l:
-        st.write("")
-        st.write("")
-        if st.button("⬅️", key="prev_w", use_container_width=True):
+        if st.button("←", key="prev_w", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
             st.session_state.curr_idx = max(0, idx - 1)
             st.session_state.input_buffer = ""
             st.rerun()
-            
+
     with col_r:
-        st.write("")
-        st.write("")
-        if st.button("➡️", key="next_w", use_container_width=True):
+        if st.button("→", key="next_w", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
             st.session_state.curr_idx = min(total - 1, idx + 1)
             st.session_state.input_buffer = ""
             st.rerun()
-            
+
     with col_pad:
         for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
             cols = st.columns(3)
@@ -289,12 +375,13 @@ with tab2:
         if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
             st.session_state.input_buffer += "0"
             st.rerun()
-        if cols_bottom[2].button("💾 決定", key="btn_w_enter", use_container_width=True, type="primary"):
+        if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
             st.session_state.curr_idx = min(total - 1, idx + 1)
             st.session_state.input_buffer = ""
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
@@ -305,55 +392,60 @@ with tab3:
     cow = st.session_state.cows[idx]
     calc = calculate_cow_metrics(cow)
     
-    display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "___")
-    
-    # 1. 上部：牛シルエット・日齢・体重・推定ボーダー・推定利益
+    display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
+
+    # 1. 購入チェック（モックアップ右上の「購入チェック」枠）
+    col_title, col_check = st.columns([4, 1])
+    with col_title:
+        st.markdown(f"<div class='cow-no-label' style='margin-top:6px;'>No.{cow['No']}</div>", unsafe_allow_html=True)
+    with col_check:
+        purchased = st.checkbox("購入チェック", value=cow["自社落札"], key=f"buy_check_{idx}")
+        st.session_state.cows[idx]["自社落札"] = purchased
+
+    # 2. 上部：牛シルエット・日齢・体重・推定ボーダー・推定利益
     st.markdown(f"""
-    <div class="cow-card">
-        <h3 style="margin:0; color:#64748b;">No. {cow['No']}</h3>
-        <div style="display:flex; justify-content:space-around; align-items:center;">
-            <div style="text-align:left; font-size:15px; font-weight:700; color:#334155;">
-                日齢: {cow['日齢']}日<br>
-                体重: {cow['体重']}kg<br>
-                父: {cow['父']}
-            </div>
+    <div class="screen-card">
+        <div class="card-top">
             {get_cow_svg(cow['No'])}
+            <div class="cow-meta">
+                日齢: <b>{cow['日齢']}日</b><br>
+                体重: <b>{cow['体重']}kg</b><br>
+                父: <b>{cow['父']}</b>
+            </div>
+            <div class="cow-metrics">
+                本日の推定平均利益　<span class="profit">{calc['推定利益']}</span>(千円)<br>
+                推定ボーダー価格　<span class="border-price">{calc['ボーダー価格']}</span>(千円)
+            </div>
+            <div class="input-display-row">
+                <span class="input-display">{display_p}</span>
+                <span class="input-unit">千円</span>
+            </div>
         </div>
-        <div style="margin-top:8px; font-size:16px; font-weight:700; color:#0f172a;">
-            本日の推定平均利益: <span style="color:#059669; font-size:18px;">{calc['推定利益']}</span> (千円)<br>
-            推定ボーダー価格: <span style="color:#2563eb; font-size:20px;">{calc['ボーダー価格']}</span> (千円)
-        </div>
-        <div><span class="input-display">{display_p}</span> <span style="font-size:20px; font-weight:700;">千円</span></div>
+        <div class="card-divider"></div>
+        <div class="card-bottom"></div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # 2. 購入チェックボックス（右上に配置）
-    purchased = st.checkbox("⭐ 自社で購入（購入チェック）", value=cow["自社落札"], key=f"buy_check_{idx}")
-    st.session_state.cows[idx]["自社落札"] = purchased
-    
+
     # 3. テンキー & 左右移動
-    col_l, col_pad, col_r = st.columns([1.2, 3.6, 1.2])
-    
+    st.markdown('<div class="numpad-area">', unsafe_allow_html=True)
+    col_l, col_pad, col_r = st.columns([1.1, 3.8, 1.1])
+
     with col_l:
-        st.write("")
-        st.write("")
-        if st.button("⬅️", key="prev_p", use_container_width=True):
+        if st.button("←", key="prev_p", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
             st.session_state.curr_idx = max(0, idx - 1)
             st.session_state.input_buffer = ""
             st.rerun()
-            
+
     with col_r:
-        st.write("")
-        st.write("")
-        if st.button("➡️", key="next_p", use_container_width=True):
+        if st.button("→", key="next_p", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
             st.session_state.curr_idx = min(total - 1, idx + 1)
             st.session_state.input_buffer = ""
             st.rerun()
-            
+
     with col_pad:
         for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
             cols = st.columns(3)
@@ -369,12 +461,13 @@ with tab3:
         if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
             st.session_state.input_buffer += "0"
             st.rerun()
-        if cols_bottom[2].button("💾 決定", key="btn_p_enter", use_container_width=True, type="primary"):
+        if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
             if st.session_state.input_buffer:
                 st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
             st.session_state.curr_idx = min(total - 1, idx + 1)
             st.session_state.input_buffer = ""
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================================================
 # 画面4: セリ結果一覧表示画面
