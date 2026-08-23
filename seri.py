@@ -7,6 +7,9 @@ import requests
 from google import genai
 from google.genai import types
 
+# --- 牛のピクトグラム画像（base64埋め込み・単一ファイルで完結させるため） ---
+COW_ICON_B64 = "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"
+
 st.set_page_config(page_title="牛セリ適正価格チェッカー", page_icon="🐄", layout="centered")
 
 # --- カスタムCSS（専用テンキー・牛カードデザイン／モックアップ準拠） ---
@@ -20,8 +23,20 @@ st.markdown("""
     div[data-testid="stTabs"] [data-baseweb="tab-list"] {
         position: static !important;
         background-color: #ffffff !important;
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
     }
     div[data-testid="stTabs"] { position: static !important; }
+    /* タブのラベル同士が重なって表示される問題を解消
+       （幅を確保しつつ、はみ出す分は横スクロールで見えるようにする） */
+    div[data-testid="stTabs"] button[data-baseweb="tab"] {
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        overflow: visible !important;
+    }
+    div[data-testid="stTabs"] button[data-baseweb="tab"] p {
+        white-space: nowrap !important;
+    }
 
     /* 画面全体を囲む1枚のカード（モックアップの外枠） */
     .screen-card {
@@ -35,6 +50,8 @@ st.markdown("""
         padding: 20px 18px 16px 18px;
         text-align: center;
         position: relative;
+        min-height: 300px;
+        box-sizing: border-box;
     }
     .card-divider {
         border-top: 2px solid #1e293b;
@@ -52,27 +69,28 @@ st.markdown("""
         margin-bottom: 4px;
     }
 
-    /* 牛のシルエット */
+    /* 牛のピクトグラム */
     .cow-icon-container {
         position: relative;
         display: inline-block;
-        width: 150px;
-        height: 95px;
+        width: 170px;
+        height: 110px;
         margin: 4px 0;
     }
-    .cow-svg {
+    .cow-img {
         width: 100%;
         height: 100%;
-        fill: #334155;
+        object-fit: contain;
     }
     .cow-number-overlay {
         position: absolute;
         top: 50%;
-        left: 50%;
-        transform: translate(-50%, -40%);
+        left: 52%;
+        transform: translate(-50%, -50%);
         color: #ffffff;
-        font-size: 26px;
+        font-size: 24px;
         font-weight: 900;
+        text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
     /* 体重・落札額の大きな入力表示（下線スタイル） */
@@ -169,6 +187,13 @@ st.markdown("""
     }
     .st-key-numpad_area_w button:hover,
     .st-key-numpad_area_p button:hover { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+    .st-key-numpad_area_w button:focus,
+    .st-key-numpad_area_p button:focus,
+    .st-key-numpad_area_w button:focus-visible,
+    .st-key-numpad_area_p button:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+    }
 
     /* 決定ボタンだけ強調 */
     .st-key-btn_w_enter button, .st-key-btn_p_enter button {
@@ -314,12 +339,10 @@ if "curr_idx" not in st.session_state:
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
 
-# --- 牛のシルエットSVGヘルパー ---
+# --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
     html = f"""<div class="cow-icon-container">
-<svg class="cow-svg" viewBox="0 0 100 65">
-<path d="M88,25 C88,20 80,15 75,18 C70,12 65,12 60,15 C55,14 35,14 25,20 C18,25 12,30 10,40 C10,48 15,55 20,55 C22,55 24,48 26,48 C28,48 30,55 35,55 C38,55 40,50 42,48 C45,48 55,48 60,52 C62,55 68,55 70,48 C72,48 76,55 80,55 C85,55 88,45 88,38 C92,35 95,28 92,24 C89,22 88,25 88,25 Z"/>
-</svg>
+<img class="cow-img" src="data:image/png;base64,{COW_ICON_B64}" alt="cow"/>
 <div class="cow-number-overlay">{number_str}</div>
 </div>"""
     return html
@@ -391,7 +414,7 @@ def render_weight_tab():
 
     # 2. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
-        col_l, col_pad, col_r = st.columns([1.1, 3.8, 1.1])
+        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
 
         with col_l:
             if st.button("←", key="prev_w", use_container_width=True):
@@ -481,7 +504,7 @@ def render_price_tab():
 
     # 3. テンキー & 左右移動
     with st.container(key="numpad_area_p"):
-        col_l, col_pad, col_r = st.columns([1.1, 3.8, 1.1])
+        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
 
         with col_l:
             if st.button("←", key="prev_p", use_container_width=True):
