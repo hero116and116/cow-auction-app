@@ -12,6 +12,16 @@ COW_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAAGXRFWHRTb2Z0d2Fy
 
 st.set_page_config(page_title="牛セリ適正価格チェッカー", page_icon="🐄", layout="centered")
 
+# --- iOS ホーム画面アイコン & アプリ名（かう）設定 ---
+st.markdown(f"""
+<head>
+    <link rel="apple-touch-icon" href="data:image/png;base64,{COW_ICON_B64}">
+    <link rel="apple-touch-icon-precomposed" href="data:image/png;base64,{COW_ICON_B64}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="かう">
+</head>
+""", unsafe_allow_html=True)
+
 # --- カスタムCSS（専用テンキー・牛カードデザイン／モックアップ準拠） ---
 st.markdown("""
 <style>
@@ -563,8 +573,8 @@ def render_price_tab():
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
         '<div class="cow-metrics">'
-        f'本日の推定平均利益　<span class="profit">{avg_profit}</span>(千円)<br>'
-        f'推定ボーダー価格　<span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
+        f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
+        f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
         '</div>'
         '<div class="input-display-row">'
         f'<span class="input-display">{display_p}</span>'
