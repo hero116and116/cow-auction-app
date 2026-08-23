@@ -252,20 +252,25 @@ st.markdown("""
         color: #1e293b !important;
         margin-top: 0 !important;
     }
-    /* Fork・GitHubアイコン・右上の3点メニューだけをピンポイントで非表示 */
-    header[data-testid="stHeader"] [data-testid="stToolbar"],
-    header[data-testid="stHeader"] .stAppToolbar,
+    
+    /* 1. サイドバー開閉ボタン（>>）を最前面に表示 */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: block !important;
+        visibility: visible !important;
+        z-index: 999999 !important;
+        color: #1e293b !important;
+    }
+
+    /* 2. 右上のメニュー（Fork, GitHub, 3点リーダー）と不要要素のみ非表示 */
+    [data-testid="stToolbar"],
+    [data-testid="stAppToolbar"],
+    .stAppToolbar,
     [data-testid="stStatusWidget"],
     [data-testid="stDecoration"],
     footer,
     div[class*="viewerBadge"],
     iframe[title*="streamlit"] {
         display: none !important;
-    }
-
-    /* ヘッダー自体の背景を透明にしてコンテンツと重ならないように調整 */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
     }
 </style>
 """, unsafe_allow_html=True)
