@@ -283,9 +283,18 @@ st.markdown("""
         font-weight: 700 !important;
         padding: 4px 10px !important;
     }
-    /* サイドバーを閉じているときは、サイドバー領域自体を完全に畳む */
-    section[data-testid="stSidebar"][aria-expanded="false"] {
-        display: none !important;
+    /* サイドバーの開閉はこちらで完全に制御するため、Streamlit内部の
+       aria-expanded に連動したスライドアニメーション(transform)や
+       幅の縮小を無効化し、常に通常表示のレイアウトに固定する */
+    section[data-testid="stSidebar"] {
+        transform: none !important;
+        min-width: 21rem !important;
+        width: 21rem !important;
+        visibility: visible !important;
+    }
+    section[data-testid="stSidebar"] > div:first-child {
+        transform: none !important;
+        width: 21rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
