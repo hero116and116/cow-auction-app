@@ -252,6 +252,10 @@ st.markdown("""
         color: #1e293b !important;
         margin-top: 0 !important;
     }
+    [data-testid="stStatusWidget"], [data-testid="stDecoration"], footer,
+    div[class*="viewerBadge"], iframe[title*="streamlit"] {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
