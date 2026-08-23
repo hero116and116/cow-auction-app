@@ -166,10 +166,10 @@ st.markdown("""
         flex-wrap: nowrap !important;
         gap: 4px !important;
     }
-    .st-key-numpad_area_w div[data-testid="stColumn"],
-    .st-key-numpad_area_p div[data-testid="stColumn"],
-    .st-key-numpad_area_w div[data-testid="column"],
-    .st-key-numpad_area_p div[data-testid="column"] {
+    .st-key-numpad_area_w div[data-testid="stColumn"] div[data-testid="stColumn"],
+    .st-key-numpad_area_p div[data-testid="stColumn"] div[data-testid="stColumn"],
+    .st-key-numpad_area_w div[data-testid="column"] div[data-testid="column"],
+    .st-key-numpad_area_p div[data-testid="column"] div[data-testid="column"] {
         width: auto !important;
         min-width: 0 !important;
         flex: 1 1 0 !important;
@@ -414,7 +414,7 @@ def render_weight_tab():
 
     # 2. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
-        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
+        col_l, col_pad, col_r = st.columns([0.7, 4.6, 0.7])
 
         with col_l:
             if st.button("←", key="prev_w", use_container_width=True):
@@ -485,7 +485,8 @@ def render_price_tab():
         '<div class="cow-meta">'
         f'日齢: <b>{cow["日齢"]}日</b><br>'
         f'体重: <b>{cow["体重"]}kg</b><br>'
-        f'父: <b>{cow["父"]}</b>'
+        f'父: <b>{cow["父"]}</b><br>'
+        f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
         '<div class="cow-metrics">'
         f'本日の推定平均利益　<span class="profit">{calc["推定利益"]}</span>(千円)<br>'
@@ -504,7 +505,7 @@ def render_price_tab():
 
     # 3. テンキー & 左右移動
     with st.container(key="numpad_area_p"):
-        col_l, col_pad, col_r = st.columns([0.85, 4.3, 0.85])
+        col_l, col_pad, col_r = st.columns([0.7, 4.6, 0.7])
 
         with col_l:
             if st.button("←", key="prev_p", use_container_width=True):
