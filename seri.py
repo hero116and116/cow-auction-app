@@ -253,38 +253,39 @@ st.markdown("""
         margin-top: 0 !important;
     }
     
-    /* 2. 右上のメニュー（Fork, GitHub, 3点リーダー）と不要要素のみ非表示
-       ※ stAppToolbar の中にサイドバー開閉ボタンも入っているため、
-          display:none で丸ごと消すと開閉ボタンまで道連れで消えてしまう。
-          visibility:hidden なら、子要素側で visibility:visible を
-          指定して個別に復活させられるため、こちらを使う。 */
+    /* Streamlit標準の開閉ボタン（>>）はバージョンによって描画が不安定なため
+       使用しない。右上のメニュー等ごと非表示にし、代わりに自前ボタンで
+       サイドバーの開閉を制御する（後述の st.button を参照）。 */
     [data-testid="stToolbar"],
     [data-testid="stAppToolbar"],
     .stAppToolbar,
     [data-testid="stStatusWidget"],
-    [data-testid="stDecoration"] {
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        pointer-events: none !important;
-    }
+    [data-testid="stDecoration"],
+    [data-testid="stSidebarCollapsedControl"],
     footer,
     div[class*="viewerBadge"],
     iframe[title*="streamlit"] {
         display: none !important;
     }
 
-    /* 1. サイドバー開閉ボタン（>>）だけを個別に復活させて最前面に表示 */
-    [data-testid="stSidebarCollapsedControl"] {
-        visibility: visible !important;
-        height: auto !important;
-        min-height: auto !important;
-        pointer-events: auto !important;
+    /* 自前の「設定を開く」フローティングボタン */
+    .st-key-open_sidebar_btn {
         position: fixed !important;
-        top: 8px !important;
-        left: 8px !important;
+        top: 10px !important;
+        left: 10px !important;
         z-index: 999999 !important;
+    }
+    .st-key-open_sidebar_btn button {
+        border-radius: 6px !important;
+        border: 1px solid #1e293b !important;
+        background-color: #ffffff !important;
         color: #1e293b !important;
+        font-weight: 700 !important;
+        padding: 4px 10px !important;
+    }
+    /* サイドバーを閉じているときは、サイドバー領域自体を完全に畳む */
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        display: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -295,8 +296,26 @@ KINTONE_DOMAIN = "cattlook.cybozu.com"
 KINTONE_APP_ID = "131"
 KINTONE_API_TOKEN = "T4aTJyzRN736eaqzzWucxZIIbXy9wYn5YkAnlJsO"
 
+# --- サイドバー開閉状態（Streamlit標準の開閉ボタンに頼らず自前で管理） ---
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = False
+
+if not st.session_state.sidebar_open:
+    # 閉じているときはサイドバー領域自体を非表示にする
+    st.markdown(
+        '<style>section[data-testid="stSidebar"]{display:none !important;}</style>',
+        unsafe_allow_html=True,
+    )
+    # 開くための丸ボタンを左上に固定表示
+    if st.button("⚙️", key="open_sidebar_btn"):
+        st.session_state.sidebar_open = True
+        st.rerun()
+
 # --- サイドバー設定 ---
 with st.sidebar:
+    if st.button("✕ 閉じる", key="close_sidebar_btn", use_container_width=True):
+        st.session_state.sidebar_open = False
+        st.rerun()
     st.header("⚙️ 共通設定（相場・コスト）")
     carcass_price = st.number_input("枝肉単価 (円/kg)", value=2500, step=50)
     daily_cost = st.number_input("1日あたり育成コスト (円)", value=850, step=10)
