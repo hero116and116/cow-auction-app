@@ -278,7 +278,7 @@ def calculate_cow_metrics(cow_row):
         days, weight = 0, 0
     
     if days <= 0 or weight <= birth_weight:
-        return {"DG": 0.0, "育成日数": 0, "育成コスト": 0, "予測出荷体重": 0.0, "予測枝肉重量": 0.0, "見込売上": 0, "ボーダー価格": 0, "推定利益": 0}
+        return {"DG": 0.0, "育成日数": 0, "育成コスト": 0, "予測出荷体重": 0.0, "予測枝肉重量": 0.0, "見込売上": 0, "ボーダー価格": 0}
     
     dg = (weight - birth_weight) / days
     raising_days = max(0, shipment_days - days)
@@ -288,9 +288,6 @@ def calculate_cow_metrics(cow_row):
     sales = int(pred_carcass_weight * carcass_price)
     border_price = max(0, (sales - cost) // 1000)
     
-    # 想定利益（売上の約15〜20%目安または目標粗利）
-    estimated_profit = max(0, int(sales * 0.15) // 1000)
-    
     return {
         "DG": round(dg, 3),
         "育成日数": int(raising_days),
@@ -299,8 +296,20 @@ def calculate_cow_metrics(cow_row):
         "予測枝肉重量": round(pred_carcass_weight, 1),
         "見込売上": sales // 1000,
         "ボーダー価格": border_price,
-        "推定利益": estimated_profit
     }
+
+# --- 本日の推定平均利益（落札額が判明している牛について、
+#     ボーダー価格－実際落札額 を求め、その平均を取る） ---
+def calculate_today_avg_profit():
+    diffs = []
+    for c in st.session_state.cows:
+        price = c.get("実際落札額", 0)
+        if price and price > 0:
+            m = calculate_cow_metrics(c)
+            diffs.append(m["ボーダー価格"] - price)
+    if not diffs:
+        return 0
+    return int(round(sum(diffs) / len(diffs)))
 
 # --- 性別正規化 ---
 def clean_gender(val):
@@ -315,7 +324,7 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
 
     prompt = """
     添付された牛のセリ名簿から各行の情報を抽出し、JSON配列として出力してください。
-    キー: No (整数), 性別 (去/雌), 日齢 (整数), 産次 (整数、無ければ0), 摘要 (文字列), 父 (文字列), 母の父 (文字列), 母の祖父 (文字列), 母の母の祖父 (文字列)
+    キー: No (整数), 性別 (去/雌), 生年月日 (文字列、名簿の表記そのまま。例: R07.11.08), 日齢 (整数), 産次 (整数、無ければ0), 摘要 (文字列), 父 (文字列), 母の父 (文字列), 母の祖父 (文字列), 母の母の祖父 (文字列)
     ※ 体重・落札額は0にしてください。JSON配列のみを出力してください。
     """
     response = client.models.generate_content(
@@ -363,7 +372,7 @@ def send_to_kintone(cows_list):
 # --- セッションステート初期化 ---
 if "cows" not in st.session_state:
     st.session_state.cows = [
-        {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False}
+        {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "生年月日": "-", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False}
         for i in range(1, 31)
     ]
 if "curr_idx_w" not in st.session_state:
@@ -440,7 +449,7 @@ def render_weight_tab():
                         st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
                     st.session_state.curr_idx_w = target_idx
                     st.session_state.input_buffer = ""
-                    st.rerun()
+                    st.rerun(scope="fragment")
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
 
@@ -475,7 +484,7 @@ def render_weight_tab():
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
                 st.session_state.curr_idx_w = max(0, idx - 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
         with col_r:
             if st.button("→", key="next_w", use_container_width=True):
@@ -483,7 +492,7 @@ def render_weight_tab():
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
         with col_pad:
             for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
@@ -491,21 +500,21 @@ def render_weight_tab():
                 for i, num in enumerate(row_nums):
                     if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
                         st.session_state.input_buffer += num
-                        st.rerun()
+                        st.rerun(scope="fragment")
             cols_bottom = st.columns(3)
             if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
                 st.session_state.input_buffer = ""
                 st.session_state.cows[idx]["体重"] = 0
-                st.rerun()
+                st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
                 st.session_state.input_buffer += "0"
-                st.rerun()
+                st.rerun(scope="fragment")
             if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
 
 with tab2:
@@ -519,6 +528,7 @@ def render_price_tab():
     idx = st.session_state.curr_idx_p
     cow = st.session_state.cows[idx]
     calc = calculate_cow_metrics(cow)
+    avg_profit = calculate_today_avg_profit()
     
     display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
@@ -537,7 +547,7 @@ def render_price_tab():
                         st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
                     st.session_state.curr_idx_p = target_idx
                     st.session_state.input_buffer = ""
-                    st.rerun()
+                    st.rerun(scope="fragment")
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
 
@@ -553,7 +563,7 @@ def render_price_tab():
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
         '<div class="cow-metrics">'
-        f'本日の推定平均利益　<span class="profit">{calc["推定利益"]}</span>(千円)<br>'
+        f'本日の推定平均利益　<span class="profit">{avg_profit}</span>(千円)<br>'
         f'推定ボーダー価格　<span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
         '</div>'
         '<div class="input-display-row">'
@@ -581,7 +591,7 @@ def render_price_tab():
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
                 st.session_state.curr_idx_p = max(0, idx - 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
         with col_r:
             if st.button("→", key="next_p", use_container_width=True):
@@ -589,7 +599,7 @@ def render_price_tab():
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
                 st.session_state.curr_idx_p = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
         with col_pad:
             for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
@@ -597,21 +607,21 @@ def render_price_tab():
                 for i, num in enumerate(row_nums):
                     if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
                         st.session_state.input_buffer += num
-                        st.rerun()
+                        st.rerun(scope="fragment")
             cols_bottom = st.columns(3)
             if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
                 st.session_state.input_buffer = ""
                 st.session_state.cows[idx]["実際落札額"] = 0
-                st.rerun()
+                st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
                 st.session_state.input_buffer += "0"
-                st.rerun()
+                st.rerun(scope="fragment")
             if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
                 st.session_state.curr_idx_p = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
-                st.rerun()
+                st.rerun(scope="fragment")
 
 
 with tab3:
@@ -626,8 +636,14 @@ with tab4:
     my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
     st.markdown("#### 🏆 本日落札した牛一覧")
     if my_cows:
-        df_my = pd.DataFrame(my_cows)[["No", "性別", "日齢", "体重", "父", "実際落札額"]]
-        df_my.columns = ["出場番号", "性別", "日齢", "当日体重(kg)", "父牛", "落札額(千円)"]
+        df_my = pd.DataFrame(my_cows)[[
+            "No", "性別", "生年月日", "日齢", "産次", "体重",
+            "父", "母の父", "母の祖父", "母の母の祖父", "摘要", "実際落札額"
+        ]]
+        df_my.columns = [
+            "出場番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
+            "父牛", "母の父", "母の祖父", "母の母の祖父", "摘要", "落札額(千円)"
+        ]
         st.dataframe(df_my, use_container_width=True, hide_index=True)
     else:
         st.info("自社落札した牛はまだありません。")
@@ -641,10 +657,16 @@ with tab4:
         m = calculate_cow_metrics(c)
         all_rows.append({
             "出場番号": c["No"],
-            "日齢": c["日齢"],
             "性別": c["性別"],
+            "生年月日": c.get("生年月日", "-"),
+            "日齢": c["日齢"],
+            "産次": c.get("産次", "-"),
             "体重(kg)": c["体重"],
             "父": c["父"],
+            "母の父": c.get("母の父", "-"),
+            "母の祖父": c.get("母の祖父", "-"),
+            "母の母の祖父": c.get("母の母の祖父", "-"),
+            "摘要": c.get("摘要", "") or "-",
             "ボーダー(千円)": m["ボーダー価格"],
             "落札額(千円)": c["実際落札額"],
             "購入結果": "自社落札" if c.get("自社落札", False) else ("他社落札" if c["実際落札額"] > 0 else "-")
