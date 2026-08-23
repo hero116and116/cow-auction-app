@@ -146,43 +146,70 @@ st.markdown("""
         text-align: center;
     }
 
+    /* No.X クリックで牛を切り替えるジャンプボタン */
+    .st-key-no_jump_w, .st-key-no_jump_p {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 4px;
+    }
+    .st-key-no_jump_w button, .st-key-no_jump_p button {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        color: #1e293b !important;
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+        padding: 4px 14px !important;
+    }
+    .st-key-no_jump_w button:hover, .st-key-no_jump_p button:hover {
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
+
+    /* 購入チェック：テンキー真上の隙間に設置（カードとテンキーをつなぐ帯） */
+    .st-key-purchase_check_area_p {
+        border: 2px solid #1e293b;
+        border-top: none;
+        margin-top: -16px;
+        padding: 8px 14px;
+        background-color: #ffffff;
+    }
+    .st-key-purchase_check_area_p div[data-testid="stCheckbox"] {
+        display: flex;
+        justify-content: flex-end;
+    }
+
     /* テンキー全体を囲むコンテナ：カード下段として視覚的につなげる */
     .st-key-numpad_area_w, .st-key-numpad_area_p {
         border: 2px solid #1e293b;
         border-top: none;
         border-radius: 0 0 4px 4px;
         margin-top: -16px;
-        padding: 14px 10px 16px 10px;
+        padding: 12px 6px 16px 6px;
         background-color: #ffffff;
     }
 
-    /* --- テンキー行のレイアウト ---
-       .st-key-numpad_area_w / .st-key-numpad_area_p は
-       st.container(key=...) が実際に生成するDOM上の親要素につく
-       クラスなので、ここを起点にスマホ幅でも横並びを強制する。 */
+    /* --- テンキー行のレイアウト（Gemini版に準拠） ---
+       flex-grow はここで触らない：st.columns([...]) の比率が
+       Streamlit側のinlineスタイルとしてそのまま効くようにするため。
+       ここでは「縮められるようにする」ことだけを担当する。 */
     .st-key-numpad_area_w div[data-testid="stHorizontalBlock"],
     .st-key-numpad_area_p div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 4px !important;
+        gap: 6px !important;
     }
     .st-key-numpad_area_w div[data-testid="stColumn"],
     .st-key-numpad_area_p div[data-testid="stColumn"],
     .st-key-numpad_area_w div[data-testid="column"],
     .st-key-numpad_area_p div[data-testid="column"] {
-        /* flex-grow はここで指定しない：
-           st.columns([...]) の比率がStreamlit側のinlineスタイルとして
-           そのまま効くようにするため。ここでは「縮められるようにする」
-           （スマホ幅ではみ出さないようにする）ことだけを担当する。 */
         width: auto !important;
         min-width: 0 !important;
-        flex-shrink: 1 !important;
-        flex-basis: 0 !important;
     }
     .st-key-numpad_area_w button,
     .st-key-numpad_area_p button {
         height: 72px !important;
-        font-size: 26px !important;
+        font-size: 28px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
         border: 1px solid #94a3b8 !important;
@@ -339,8 +366,10 @@ if "cows" not in st.session_state:
         {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False}
         for i in range(1, 31)
     ]
-if "curr_idx" not in st.session_state:
-    st.session_state.curr_idx = 0
+if "curr_idx_w" not in st.session_state:
+    st.session_state.curr_idx_w = 0
+if "curr_idx_p" not in st.session_state:
+    st.session_state.curr_idx_p = 0
 if "input_buffer" not in st.session_state:
     st.session_state.input_buffer = ""
 
@@ -380,7 +409,8 @@ with tab1:
                     r["実際落札額"] = 0
                     r["自社落札"] = False
                 st.session_state.cows = parsed
-                st.session_state.curr_idx = 0
+                st.session_state.curr_idx_w = 0
+                st.session_state.curr_idx_p = 0
                 st.session_state.input_buffer = ""
                 st.session_state.just_parsed_count = len(parsed)
                 st.toast("読み取りが完了しました！", icon="✅")
@@ -392,16 +422,34 @@ with tab1:
 @st.fragment
 def render_weight_tab():
     total = len(st.session_state.cows)
-    idx = st.session_state.curr_idx
+    idx = st.session_state.curr_idx_w
     cow = st.session_state.cows[idx]
     
-    # 1. 上部：牛シルエット＆No（モックアップの「体重入力画面」上段）
+    # 1. No.Xをクリックすると番号を直接入力して任意の牛へ移動できる
+    with st.container(key="no_jump_w"):
+        with st.popover(f"No.{cow['No']} ✎"):
+            nos = [c["No"] for c in st.session_state.cows]
+            target_no = st.number_input(
+                "出場番号を入力して移動", min_value=int(min(nos)), max_value=int(max(nos)),
+                value=int(cow["No"]), step=1, key=f"jump_no_w_{idx}"
+            )
+            if st.button("この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True):
+                target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
+                if target_idx is not None:
+                    if st.session_state.input_buffer:
+                        st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
+                    st.session_state.curr_idx_w = target_idx
+                    st.session_state.input_buffer = ""
+                    st.rerun()
+                else:
+                    st.warning("その出場番号は見つかりませんでした。")
+
+    # 2. 上部：牛シルエット＆入力表示（モックアップの「体重入力画面」上段）
     display_w = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["体重"]) if cow["体重"] > 0 else "")
 
     card_html_w = (
         '<div class="screen-card">'
         '<div class="card-top">'
-        f'<div class="cow-no-label">No.{cow["No"]}</div>'
         f'{get_cow_svg(cow["No"])}'
         '<div class="input-display-row">'
         f'<span class="input-display">{display_w}</span>'
@@ -417,15 +465,15 @@ def render_weight_tab():
     )
     st.markdown(card_html_w, unsafe_allow_html=True)
 
-    # 2. テンキー & 左右移動ボタン（カード下段を模したグリッド）
+    # 3. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
-        col_l, col_pad, col_r = st.columns([0.7, 4.6, 0.7])
+        col_l, col_pad, col_r = st.columns([0.6, 5.0, 0.6])
 
         with col_l:
             if st.button("←", key="prev_w", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx = max(0, idx - 1)
+                st.session_state.curr_idx_w = max(0, idx - 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -433,7 +481,7 @@ def render_weight_tab():
             if st.button("→", key="next_w", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx = min(total - 1, idx + 1)
+                st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -455,7 +503,7 @@ def render_weight_tab():
             if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
-                st.session_state.curr_idx = min(total - 1, idx + 1)
+                st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -468,19 +516,30 @@ with tab2:
 @st.fragment
 def render_price_tab():
     total = len(st.session_state.cows)
-    idx = st.session_state.curr_idx
+    idx = st.session_state.curr_idx_p
     cow = st.session_state.cows[idx]
     calc = calculate_cow_metrics(cow)
     
     display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
-    # 1. 購入チェック（モックアップ右上の「購入チェック」枠）
-    col_title, col_check = st.columns([4, 1])
-    with col_title:
-        st.markdown(f"<div class='cow-no-label' style='margin-top:6px;'>No.{cow['No']}</div>", unsafe_allow_html=True)
-    with col_check:
-        purchased = st.checkbox("購入チェック", value=cow["自社落札"], key=f"buy_check_{idx}")
-        st.session_state.cows[idx]["自社落札"] = purchased
+    # 1. No.Xをクリックすると番号を直接入力して任意の牛へ移動できる
+    with st.container(key="no_jump_p"):
+        with st.popover(f"No.{cow['No']} ✎"):
+            nos = [c["No"] for c in st.session_state.cows]
+            target_no = st.number_input(
+                "出場番号を入力して移動", min_value=int(min(nos)), max_value=int(max(nos)),
+                value=int(cow["No"]), step=1, key=f"jump_no_p_{idx}"
+            )
+            if st.button("この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True):
+                target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
+                if target_idx is not None:
+                    if st.session_state.input_buffer:
+                        st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
+                    st.session_state.curr_idx_p = target_idx
+                    st.session_state.input_buffer = ""
+                    st.rerun()
+                else:
+                    st.warning("その出場番号は見つかりませんでした。")
 
     # 2. 上部：牛シルエット・日齢・体重・推定ボーダー・推定利益
     card_html_p = (
@@ -503,20 +562,24 @@ def render_price_tab():
         '</div>'
         '</div>'
         '<div class="card-divider"></div>'
-        '<div class="card-bottom"></div>'
         '</div>'
     )
     st.markdown(card_html_p, unsafe_allow_html=True)
 
-    # 3. テンキー & 左右移動
+    # 3. 購入チェック（テンキー真上の隙間に移動）
+    with st.container(key="purchase_check_area_p"):
+        purchased = st.checkbox("購入チェック", value=cow["自社落札"], key=f"buy_check_{idx}")
+        st.session_state.cows[idx]["自社落札"] = purchased
+
+    # 4. テンキー & 左右移動
     with st.container(key="numpad_area_p"):
-        col_l, col_pad, col_r = st.columns([0.7, 4.6, 0.7])
+        col_l, col_pad, col_r = st.columns([0.6, 5.0, 0.6])
 
         with col_l:
             if st.button("←", key="prev_p", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx = max(0, idx - 1)
+                st.session_state.curr_idx_p = max(0, idx - 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -524,7 +587,7 @@ def render_price_tab():
             if st.button("→", key="next_p", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx = min(total - 1, idx + 1)
+                st.session_state.curr_idx_p = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
@@ -546,7 +609,7 @@ def render_price_tab():
             if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
                 if st.session_state.input_buffer:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
-                st.session_state.curr_idx = min(total - 1, idx + 1)
+                st.session_state.curr_idx_p = min(total - 1, idx + 1)
                 st.session_state.input_buffer = ""
                 st.rerun()
 
