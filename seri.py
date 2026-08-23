@@ -166,13 +166,18 @@ st.markdown("""
         flex-wrap: nowrap !important;
         gap: 4px !important;
     }
-    .st-key-numpad_area_w div[data-testid="stColumn"] div[data-testid="stColumn"],
-    .st-key-numpad_area_p div[data-testid="stColumn"] div[data-testid="stColumn"],
-    .st-key-numpad_area_w div[data-testid="column"] div[data-testid="column"],
-    .st-key-numpad_area_p div[data-testid="column"] div[data-testid="column"] {
+    .st-key-numpad_area_w div[data-testid="stColumn"],
+    .st-key-numpad_area_p div[data-testid="stColumn"],
+    .st-key-numpad_area_w div[data-testid="column"],
+    .st-key-numpad_area_p div[data-testid="column"] {
+        /* flex-grow はここで指定しない：
+           st.columns([...]) の比率がStreamlit側のinlineスタイルとして
+           そのまま効くようにするため。ここでは「縮められるようにする」
+           （スマホ幅ではみ出さないようにする）ことだけを担当する。 */
         width: auto !important;
         min-width: 0 !important;
-        flex: 1 1 0 !important;
+        flex-shrink: 1 !important;
+        flex-basis: 0 !important;
     }
     .st-key-numpad_area_w button,
     .st-key-numpad_area_p button {
