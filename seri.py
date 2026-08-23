@@ -14,12 +14,30 @@ st.set_page_config(page_title="牛セリ適正価格チェッカー", page_icon=
 
 # --- iOS ホーム画面アイコン & アプリ名（かう）設定 ---
 st.markdown(f"""
-<head>
-    <link rel="apple-touch-icon" href="data:image/png;base64,{COW_ICON_B64}">
-    <link rel="apple-touch-icon-precomposed" href="data:image/png;base64,{COW_ICON_B64}">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="かう">
-</head>
+<script>
+    (function() {{
+        // 親ウィンドウのheadを取得
+        const docHead = window.parent.document.getElementsByTagName('head')[0] || document.getElementsByTagName('head')[0];
+        
+        // apple-touch-icon を追加
+        let appleIcon = docHead.querySelector("link[rel*='apple-touch-icon']");
+        if (!appleIcon) {{
+            appleIcon = document.createElement('link');
+            appleIcon.rel = 'apple-touch-icon';
+            docHead.appendChild(appleIcon);
+        }}
+        appleIcon.href = "data:image/png;base64,{COW_ICON_B64}";
+
+        // アプリ名（apple-mobile-web-app-title）を追加
+        let appTitle = docHead.querySelector("meta[name='apple-mobile-web-app-title']");
+        if (!appTitle) {{
+            appTitle = document.createElement('meta');
+            appTitle.name = 'apple-mobile-web-app-title';
+            docHead.appendChild(appTitle);
+        }}
+        appTitle.content = "かう";
+    }})();
+</script>
 """, unsafe_allow_html=True)
 
 # --- カスタムCSS（専用テンキー・牛カードデザイン／モックアップ準拠） ---
