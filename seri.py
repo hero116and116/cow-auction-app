@@ -253,24 +253,38 @@ st.markdown("""
         margin-top: 0 !important;
     }
     
-    /* 1. サイドバー開閉ボタン（>>）を最前面に表示 */
-    [data-testid="stSidebarCollapsedControl"] {
-        display: block !important;
-        visibility: visible !important;
-        z-index: 999999 !important;
-        color: #1e293b !important;
-    }
-
-    /* 2. 右上のメニュー（Fork, GitHub, 3点リーダー）と不要要素のみ非表示 */
+    /* 2. 右上のメニュー（Fork, GitHub, 3点リーダー）と不要要素のみ非表示
+       ※ stAppToolbar の中にサイドバー開閉ボタンも入っているため、
+          display:none で丸ごと消すと開閉ボタンまで道連れで消えてしまう。
+          visibility:hidden なら、子要素側で visibility:visible を
+          指定して個別に復活させられるため、こちらを使う。 */
     [data-testid="stToolbar"],
     [data-testid="stAppToolbar"],
     .stAppToolbar,
     [data-testid="stStatusWidget"],
-    [data-testid="stDecoration"],
+    [data-testid="stDecoration"] {
+        visibility: hidden !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        pointer-events: none !important;
+    }
     footer,
     div[class*="viewerBadge"],
     iframe[title*="streamlit"] {
         display: none !important;
+    }
+
+    /* 1. サイドバー開閉ボタン（>>）だけを個別に復活させて最前面に表示 */
+    [data-testid="stSidebarCollapsedControl"] {
+        visibility: visible !important;
+        height: auto !important;
+        min-height: auto !important;
+        pointer-events: auto !important;
+        position: fixed !important;
+        top: 8px !important;
+        left: 8px !important;
+        z-index: 999999 !important;
+        color: #1e293b !important;
     }
 </style>
 """, unsafe_allow_html=True)
