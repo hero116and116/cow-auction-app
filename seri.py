@@ -262,6 +262,11 @@ st.markdown("""
     [data-testid="stStatusWidget"],
     [data-testid="stDecoration"],
     [data-testid="stSidebarCollapsedControl"],
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebarHeader"] button,
+    section[data-testid="stSidebar"] button[kind="header"],
+    section[data-testid="stSidebar"] button[aria-label*="lose"],
+    section[data-testid="stSidebar"] button[aria-label*="ollapse"],
     footer,
     div[class*="viewerBadge"],
     iframe[title*="streamlit"] {
