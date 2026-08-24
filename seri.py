@@ -151,7 +151,7 @@ st.markdown("""
     }
 
     /* 落札価格入力画面：牛の特徴（マイナス要素）バッジ */
-    .cow-neg-factors { margin-top: 6px; }
+    .cow-neg-factors { margin-bottom: 8px; }
     .neg-badge {
         display: inline-block;
         background-color: #fff7ed;
@@ -197,21 +197,23 @@ st.markdown("""
         justify-content: flex-end;
     }
 
-    /* マイナス要素チップ（体重入力画面）：
-       新しく別の箱を作らず、ピクトグラム・性別・日齢が入っているカード上部
-       （.card-top）の余白部分に重ねて表示することで、画面が縦長にならない
-       ようにしている（負のmarginでカード下部の空きスペースへ引き上げる） */
+    /* マイナス要素チップ（体重入力画面）：カードとテンキーの間に挟む帯として
+       表示する。以前は負のmarginでカード上部の余白に重ねていたが、
+       選択項目数によって2行に折り返るとボックス外にはみ出す事故が
+       起きたため、通常のレイアウト（内容量に応じて自動で高さが伸びる）
+       に変更し、必ず枠内に収まるようにしている */
     .st-key-negative_factors_area_w {
-        margin-top: -58px;
-        margin-bottom: 8px;
-        padding: 0 16px;
-        position: relative;
-        z-index: 2;
+        border: 2px solid #1e293b;
+        border-top: none;
+        margin-top: -16px;
+        padding: 10px 14px;
+        background-color: #ffffff;
     }
     .st-key-negative_factors_area_w [data-testid="stPills"] {
         display: flex;
         justify-content: center;
         flex-wrap: wrap;
+        gap: 6px;
     }
     .st-key-negative_factors_area_w [data-testid="stPills"] button {
         font-size: 12px !important;
@@ -582,8 +584,7 @@ def render_weight_tab():
     st.markdown(card_html_w, unsafe_allow_html=True)
 
     # 2.5 マイナス要素チェック（該当する場合のみ選択）
-    # ピクトグラム・性別・日齢が入っているカード本体の余白部分に収まるよう、
-    # チップ形式（st.pills）で1行にまとめ、上に重ねて表示する（別枠の箱を増やさない）
+    # カードとテンキーの間の帯として表示（枠内に確実に収まる自動高さレイアウト）
     with st.container(key="negative_factors_area_w"):
         current_negs = cow.get("マイナス要素", [])
         selected_negs = st.pills(
@@ -675,10 +676,11 @@ def render_price_tab():
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
 
-    # 2. 上部：牛シルエット・日齢・体重・推定ボーダー・推定利益
+    # 2. 上部：特徴（マイナス要素）・牛シルエット・日齢・体重・推定ボーダー・推定利益
     card_html_p = (
         '<div class="screen-card">'
         '<div class="card-top">'
+        f'{neg_line_html}'
         f'{get_cow_svg(cow["No"])}'
         '<div class="cow-meta">'
         f'日齢: <b>{cow["日齢"]}日</b><br>'
@@ -686,7 +688,6 @@ def render_price_tab():
         f'父: <b>{cow["父"]}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
-        f'{neg_line_html}'
         '<div class="cow-metrics">'
         f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
         f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
