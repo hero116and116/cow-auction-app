@@ -625,7 +625,12 @@ def render_weight_tab():
             key=f"neg_pills_{idx}",
             label_visibility="collapsed",
         )
-        st.session_state.cows[idx]["マイナス要素"] = list(selected_negs) if selected_negs else []
+        # st.pillsはクリックした順番で選択結果を返すため、そのまま保存すると
+        # 落札価格入力画面でのバッジ表示順が押した順によってバラつく。
+        # NEGATIVE_FACTORSの並び順に揃えて保存することで表示順を固定する
+        st.session_state.cows[idx]["マイナス要素"] = (
+            [f for f in NEGATIVE_FACTORS if f in selected_negs] if selected_negs else []
+        )
 
     # 3. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
@@ -683,7 +688,9 @@ def render_price_tab():
     
     display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
-    neg_factors = cow.get("マイナス要素", [])
+    # 保存順は基本NEGATIVE_FACTORS順のはずだが、念のため表示時にも
+    # 並び順を揃えておく（既存データが古い順番で保存されていた場合の保険）
+    neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
     neg_badges_html = "".join(f'<span class="neg-badge">{n}</span>' for n in neg_factors)
     # 縦に長くならないよう、行として確保せず牛ピクトグラムの左上に重ねて表示する
     neg_corner_html = f'<div class="cow-neg-factors">{neg_badges_html}</div>' if neg_factors else ""
