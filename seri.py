@@ -1118,10 +1118,14 @@ def render_results_tab():
                 new_c["マイナス要素"] = []
                 clean_cows.append(new_c)
             
+            # 次の世代番号を記録
+            next_reset_ver = st.session_state.get("reset_ver", 0) + 1
+            
             # ③ ウィジェットの内部状態を全消去
             st.session_state.clear()
             
             # ④ クリーンな状態を再セット
+            st.session_state.reset_ver = next_reset_ver
             st.session_state.cows = clean_cows
             st.session_state.curr_idx_w = 0
             st.session_state.curr_idx_p = 0
