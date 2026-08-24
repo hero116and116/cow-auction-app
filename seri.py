@@ -12,6 +12,9 @@ COW_ICON_B64 = "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAAGXRFWHRTb2Z0d2Fy
 
 st.set_page_config(page_title="かう(セリのボーダー計算、結果保存アプリ)", page_icon="🐄", layout="centered")
 
+# --- マイナス要素の項目一覧（体重入力画面でチェック → 落札価格入力画面で表示） ---
+NEGATIVE_FACTORS = ["馬面", "口が小さい", "尾枕がある", "皮膚の伸びが悪い", "背中が曲がっている"]
+
 
 # --- カスタムCSS（専用テンキー・牛カードデザイン／モックアップ準拠） ---
 st.markdown("""
@@ -147,6 +150,20 @@ st.markdown("""
         text-align: center;
     }
 
+    /* 落札価格入力画面：牛の特徴（マイナス要素）バッジ */
+    .cow-neg-factors { margin-top: 6px; }
+    .neg-badge {
+        display: inline-block;
+        background-color: #fff7ed;
+        color: #c2410c;
+        border: 1px solid #fdba74;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 2px 8px;
+        margin: 2px 4px 0 0;
+    }
+
     /* No.X クリックで牛を切り替えるジャンプボタン */
     .st-key-no_jump_w, .st-key-no_jump_p {
         display: flex;
@@ -178,6 +195,24 @@ st.markdown("""
     .st-key-purchase_check_area_p div[data-testid="stCheckbox"] {
         display: flex;
         justify-content: flex-end;
+    }
+
+    /* マイナス要素チェック欄：カードとテンキーの間に挟む帯（体重入力画面） */
+    .st-key-negative_factors_area_w {
+        border: 2px solid #1e293b;
+        border-top: none;
+        margin-top: -16px;
+        padding: 10px 14px 4px 14px;
+        background-color: #ffffff;
+    }
+    .negative-factors-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        margin-bottom: 2px;
+    }
+    .st-key-negative_factors_area_w div[data-testid="stCheckbox"] label p {
+        font-size: 13px !important;
     }
 
     /* テンキー全体を囲むコンテナ：カード下段として視覚的につなげる */
@@ -440,7 +475,7 @@ def send_to_kintone(cows_list):
 # --- セッションステート初期化 ---
 if "cows" not in st.session_state:
     st.session_state.cows = [
-        {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "生年月日": "-", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False}
+        {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "生年月日": "-", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False, "マイナス要素": []}
         for i in range(1, 31)
     ]
 if "curr_idx_w" not in st.session_state:
@@ -485,6 +520,7 @@ with tab1:
                     r["体重"] = 0
                     r["実際落札額"] = 0
                     r["自社落札"] = False
+                    r["マイナス要素"] = []
                 st.session_state.cows = parsed
                 st.session_state.curr_idx_w = 0
                 st.session_state.curr_idx_p = 0
@@ -541,6 +577,19 @@ def render_weight_tab():
         '</div>'
     )
     st.markdown(card_html_w, unsafe_allow_html=True)
+
+    # 2.5 マイナス要素チェック（該当する場合のみチェックを入れる）
+    with st.container(key="negative_factors_area_w"):
+        st.markdown('<div class="negative-factors-label">▼ マイナス要素（該当する項目のみチェック）</div>', unsafe_allow_html=True)
+        current_negs = cow.get("マイナス要素", [])
+        new_negs = []
+        cols_neg = st.columns(2)
+        for i, factor in enumerate(NEGATIVE_FACTORS):
+            with cols_neg[i % 2]:
+                checked = st.checkbox(factor, value=(factor in current_negs), key=f"neg_{i}_{idx}")
+                if checked:
+                    new_negs.append(factor)
+        st.session_state.cows[idx]["マイナス要素"] = new_negs
 
     # 3. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
@@ -600,6 +649,10 @@ def render_price_tab():
     
     display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
+    neg_factors = cow.get("マイナス要素", [])
+    neg_badges_html = "".join(f'<span class="neg-badge">{n}</span>' for n in neg_factors)
+    neg_line_html = f'<div class="cow-neg-factors">特徴: {neg_badges_html}</div>' if neg_factors else ""
+
     # 1. No.Xをクリックすると番号を直接入力して任意の牛へ移動できる
     with st.container(key="no_jump_p"):
         with st.popover(f"No.{cow['No']} ✎"):
@@ -630,6 +683,7 @@ def render_price_tab():
         f'父: <b>{cow["父"]}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
+        f'{neg_line_html}'
         '<div class="cow-metrics">'
         f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
         f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
