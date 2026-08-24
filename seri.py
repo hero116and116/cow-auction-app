@@ -1124,20 +1124,17 @@ def render_results_tab():
   df_all = pd.DataFrame(all_rows)
   st.dataframe(df_all, use_container_width=True, hide_index=True)
 
-  st.divider()
-
-    # 3. kintone送信ボタン
-# 3. kintone送信ボタン
-if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
-    with st.spinner("kintoneにデータを送信中..."):
-        success, msg = send_to_kintone(st.session_state.cows)
-        if success:
-            st.success(msg)
-                
-                # ① バックアップファイルを削除
+st.divider()
+    
+    # 3. kintone送信・確認リセットフロー
+if st.session_state.get("kintone_sent_success"):
+        st.success("✅ kintoneにデータを正常に送信しました！")
+        st.info("💡 入力値をリセットし、次回のセリの準備をします。")
+        if st.button("🧹 画面をリセットして次のセリへ", type="primary", use_container_width=True):
+            # ① バックアップファイルを削除
             clear_backup()
-                
-                # ② 名簿のベース情報（番号・血統など）だけ残し、入力した数値・チェックを初期化
+            
+            # ② 名簿のベース情報だけ残し、入力した数値をクリア
             clean_cows = []
             for c in st.session_state.cows:
                 new_c = c.copy()
@@ -1146,23 +1143,27 @@ if st.button("☁️ タップでkintoneに送る", type="primary", use_containe
                 new_c["自社落札"] = False
                 new_c["マイナス要素"] = []
                 clean_cows.append(new_c)
-                
-                # ③ ウィジェットの内部状態（チェックボックスやpillsのキャッシュ）を全消去
+            
+            # ③ ウィジェットの内部状態を全消去
             st.session_state.clear()
-                
-                # ④ クリーンな初期状態を再セット
+            
+            # ④ クリーンな状態を再セット
             st.session_state.cows = clean_cows
             st.session_state.curr_idx_w = 0
             st.session_state.curr_idx_p = 0
             st.session_state.input_buffer_w = ""
             st.session_state.input_buffer_p = ""
             st.session_state.metrics_dirty = True
-                
-            st.toast("入力データを完全に初期化しました 🧹", icon="✅")
             st.rerun()
-        else:
-            st.error(msg)
-
+else:
+        if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
+            with st.spinner("kintoneにデータを送信中..."):
+                success, msg = send_to_kintone(st.session_state.cows)
+                if success:
+                    st.session_state.kintone_sent_success = True
+                    st.rerun(scope="fragment")
+                else:
+                    st.error(msg)
 
 with tab4:
-  render_results_tab()
+    render_results_tab()
