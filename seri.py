@@ -100,40 +100,43 @@ st.markdown("""
     .cow-top-row {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 4px;
+        justify-content: flex-start; /* 均等配置から左詰めに変更 */
+        gap: 2px;                    /* カラム間の隙間を詰める */
         text-align: left;
     }
     /* 左カラム：日齢・体重・父・DG・kg単価・摘要 */
     .cow-info-col {
-        flex: 1 1 auto;
+        flex: 0 0 auto;              /* 横幅をコンテンツなりに固定して余白をカット */
         min-width: 0;
     }
     .cow-top-row .cow-meta {
         margin-top: 0;
         font-size: 13px;
         line-height: 1.45;
+        padding-right: 4px;          /* テキスト右側の余白を最小化 */
     }
-    /* 中央カラム：牛ピクトグラム（出場番号付き）を拡大 */
+    /* 中央カラム：牛ピクトグラム（左へシフト） */
     .cow-icon-col {
         flex: 0 0 auto;
         display: flex;
         justify-content: center;
         align-items: center;
+        margin-left: 2px;            /* 必要に応じて -5px や -10px などでさらに左に引っ張れます */
     }
     .cow-top-row .cow-icon-container {
-        width: 120px;       /* 88px → 120px に拡大 */
-        height: 78px;       /* 57px → 78px に拡大 */
+        width: 120px;
+        height: 78px;
         margin: 0;
         flex-shrink: 0;
     }
     .cow-top-row .cow-number-overlay {
-        font-size: 19px;    /* 15px → 19px に拡大 */
+        font-size: 19px;
     }
-    /* 右カラム：マイナス要素バッジ（縦並び） */
+    /* 右カラム：マイナス要素バッジ（右端へ押し出す） */
     .cow-neg-col {
         flex: 0 0 62px;
         min-width: 0;
+        margin-left: auto;           /* 右カラムだけカードの右端に寄せる */
         display: flex;
         flex-direction: column;
         align-items: flex-end;
