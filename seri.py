@@ -96,6 +96,30 @@ st.markdown("""
         text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
+    /* 落札価格入力画面：牛アイコンと項目テキスト（日齢・体重・DG等）を
+       縦積みではなく横並びにして、項目数が増えてもカードの縦幅が
+       伸びにくいようにする（体重入力画面側の.card-topレイアウトは
+       別構造のため触らず、この専用クラスの中だけ上書きする） */
+    .cow-top-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        text-align: left;
+    }
+    .cow-top-row .cow-icon-container {
+        width: 108px;
+        height: 70px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+    .cow-top-row .cow-number-overlay {
+        font-size: 17px;
+    }
+    .cow-top-row .cow-meta {
+        margin-top: 0;
+    }
+
     /* 体重・落札額の大きな入力表示（下線スタイル）
        align-items は baseline ではなく flex-end を使う。baseline だと
        中身が空文字の時と数字が入った時とでボックスのベースライン計算が
@@ -734,6 +758,7 @@ def render_price_tab():
         '<div class="screen-card">'
         '<div class="card-top">'
         f'{neg_corner_html}'
+        '<div class="cow-top-row">'
         f'{get_cow_svg(cow["No"])}'
         '<div class="cow-meta">'
         f'日齢: <b>{cow["日齢"]}日</b><br>'
@@ -742,6 +767,7 @@ def render_price_tab():
         f'DG: <b>{calc["DG"]}kg/日</b><br>'
         f'kgあたり単価: <b>{unit_price_text}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
+        '</div>'
         '</div>'
         '<div class="cow-metrics">'
         f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
