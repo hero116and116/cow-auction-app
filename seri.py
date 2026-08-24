@@ -96,50 +96,43 @@ st.markdown("""
         text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
-    /* 落札価格入力画面：牛の基本情報／牛アイコン／マイナス要素バッジを
-       横並び3カラム（情報 / アイコン / マイナス要素）にして、項目が
-       増えてもカードの縦幅が伸びにくいようにする（体重入力画面側の
-       .card-topレイアウトは別構造のため触らず、この専用クラスの中だけ
-       上書きする）。マイナス要素は絶対配置での重ね表示をやめ、
-       右端カラムに縦並びのFlexアイテムとして表示する。 */
+    /* 落札価格入力画面：牛の基本情報／牛アイコン／マイナス要素バッジ（3カラム） */
     .cow-top-row {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
-        gap: 6px;
+        gap: 4px;
         text-align: left;
     }
-    /* 左カラム：日齢・体重・父・DG・kg単価・摘要
-       flex: 1 1 auto + min-width: 0 でカード幅に合わせて伸縮させ、
-       狭い画面幅でも他カラムを圧迫しないようにする */
+    /* 左カラム：日齢・体重・父・DG・kg単価・摘要 */
     .cow-info-col {
         flex: 1 1 auto;
         min-width: 0;
     }
-    /* 中央カラム：牛ピクトグラム（出場番号付き） */
+    .cow-top-row .cow-meta {
+        margin-top: 0;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+    /* 中央カラム：牛ピクトグラム（出場番号付き）を拡大 */
     .cow-icon-col {
         flex: 0 0 auto;
         display: flex;
         justify-content: center;
-        align-items: flex-start;
+        align-items: center;
     }
     .cow-top-row .cow-icon-container {
-        width: 88px;
-        height: 57px;
+        width: 120px;       /* 88px → 120px に拡大 */
+        height: 78px;       /* 57px → 78px に拡大 */
         margin: 0;
         flex-shrink: 0;
     }
     .cow-top-row .cow-number-overlay {
-        font-size: 15px;
+        font-size: 19px;    /* 15px → 19px に拡大 */
     }
-    .cow-top-row .cow-meta {
-        margin-top: 0;
-    }
-    /* 右カラム：マイナス要素バッジ（縦並び）
-       幅を固定しておくことで、牛によってバッジの有無が変わっても
-       アイコン位置などカード全体のレイアウトがガタつかないようにする */
+    /* 右カラム：マイナス要素バッジ（縦並び） */
     .cow-neg-col {
-        flex: 0 0 66px;
+        flex: 0 0 62px;
         min-width: 0;
         display: flex;
         flex-direction: column;
