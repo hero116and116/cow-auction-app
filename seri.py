@@ -96,28 +96,55 @@ st.markdown("""
         text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
-    /* 落札価格入力画面：牛アイコンと項目テキスト（日齢・体重・DG等）を
-       縦積みではなく横並びにして、項目数が増えてもカードの縦幅が
-       伸びにくいようにする（体重入力画面側の.card-topレイアウトは
-       別構造のため触らず、この専用クラスの中だけ上書きする） */
+    /* 落札価格入力画面：牛の基本情報／牛アイコン／マイナス要素バッジを
+       横並び3カラム（情報 / アイコン / マイナス要素）にして、項目が
+       増えてもカードの縦幅が伸びにくいようにする（体重入力画面側の
+       .card-topレイアウトは別構造のため触らず、この専用クラスの中だけ
+       上書きする）。マイナス要素は絶対配置での重ね表示をやめ、
+       右端カラムに縦並びのFlexアイテムとして表示する。 */
     .cow-top-row {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 6px;
         text-align: left;
     }
+    /* 左カラム：日齢・体重・父・DG・kg単価・摘要
+       flex: 1 1 auto + min-width: 0 でカード幅に合わせて伸縮させ、
+       狭い画面幅でも他カラムを圧迫しないようにする */
+    .cow-info-col {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    /* 中央カラム：牛ピクトグラム（出場番号付き） */
+    .cow-icon-col {
+        flex: 0 0 auto;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
     .cow-top-row .cow-icon-container {
-        width: 108px;
-        height: 70px;
+        width: 88px;
+        height: 57px;
         margin: 0;
         flex-shrink: 0;
     }
     .cow-top-row .cow-number-overlay {
-        font-size: 17px;
+        font-size: 15px;
     }
     .cow-top-row .cow-meta {
         margin-top: 0;
+    }
+    /* 右カラム：マイナス要素バッジ（縦並び）
+       幅を固定しておくことで、牛によってバッジの有無が変わっても
+       アイコン位置などカード全体のレイアウトがガタつかないようにする */
+    .cow-neg-col {
+        flex: 0 0 66px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
     }
 
     /* 体重・落札額の大きな入力表示（下線スタイル）
@@ -178,20 +205,8 @@ st.markdown("""
     }
 
     /* 落札価格入力画面：牛の特徴（マイナス要素）バッジ
-       カードが縦に伸びすぎないよう、行として確保するのではなく
-       牛ピクトグラムの左上（購入チェックの右上表示と対の位置）に
-       小さく重ねて表示する */
-    .cow-neg-factors {
-        position: absolute;
-        top: 12px;
-        left: 14px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 3px;
-        max-width: 76px;
-        z-index: 2;
-    }
+       表示位置・レイアウトは .cow-neg-col（横並び3カラムの右カラム）
+       側で制御する。バッジ自体の見た目（色・形）のみここで定義する。 */
     .neg-badge {
         display: inline-block;
         background-color: #fff7ed;
@@ -739,8 +754,6 @@ def render_price_tab():
     # 並び順を揃えておく（既存データが古い順番で保存されていた場合の保険）
     neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
     neg_badges_html = "".join(f'<span class="neg-badge">{n}</span>' for n in neg_factors)
-    # 縦に長くならないよう、行として確保せず牛ピクトグラムの左上に重ねて表示する
-    neg_corner_html = f'<div class="cow-neg-factors">{neg_badges_html}</div>' if neg_factors else ""
 
     # 1. No.Xをクリックすると番号を直接入力して任意の牛へ移動できる
     with st.container(key="no_jump_p"):
@@ -762,7 +775,7 @@ def render_price_tab():
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
 
-    # 2. 上部：特徴（マイナス要素）・牛シルエット・日齢・体重・推定ボーダー・推定利益
+    # 2. 上部：横並び3カラム構成（左：基本情報 / 中央：牛シルエット / 右：マイナス要素バッジ）
     # DGは calculate_cow_metrics() が既に算出したものを利用する（(体重-生時体重)/日齢）。
     # kgあたり単価は、テンキー入力中の値ではなく確定済みの実際落札額のみを
     # 見て計算する。こうすることで、決定ボタンか矢印ボタンが押されて
@@ -783,17 +796,20 @@ def render_price_tab():
     card_html_p = (
         '<div class="screen-card">'
         '<div class="card-top">'
-        f'{neg_corner_html}'
         '<div class="cow-top-row">'
-        f'{get_cow_svg(cow["No"])}'
-        '<div class="cow-meta">'
+        # 左カラム：基本情報（kg単価は横長化を防ぐため改行して表示）
+        '<div class="cow-info-col cow-meta">'
         f'日齢: <b>{cow["日齢"]}日</b><br>'
         f'体重: <b>{cow["体重"]}kg</b><br>'
         f'父: <b>{cow["父"]}</b><br>'
         f'DG: <b>{calc["DG"]}kg/日</b><br>'
-        f'単価: <b>{unit_price_text}</b><br>'
+        f'kg単価:<br><b>{unit_price_text}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
+        # 中央カラム：牛ピクトグラム（出場番号付き）
+        f'<div class="cow-icon-col">{get_cow_svg(cow["No"])}</div>'
+        # 右カラム：マイナス要素バッジ（縦並び、絶対配置での重ね表示はしない）
+        f'<div class="cow-neg-col">{neg_badges_html}</div>'
         '</div>'
         '<div class="cow-metrics">'
         f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
