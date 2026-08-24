@@ -54,7 +54,6 @@ st.markdown("""
         padding: 20px 18px 16px 18px;
         text-align: center;
         position: relative;
-        min-height: 300px;
         box-sizing: border-box;
     }
     .card-divider {
@@ -97,10 +96,14 @@ st.markdown("""
         text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
-    /* 体重・落札額の大きな入力表示（下線スタイル） */
+    /* 体重・落札額の大きな入力表示（下線スタイル）
+       align-items は baseline ではなく flex-end を使う。baseline だと
+       中身が空文字の時と数字が入った時とでボックスのベースライン計算が
+       変わり、kg/千円 などの単位表示や下の項目が数字入力のたびに
+       微妙に上下してしまうため（下端揃えなら中身の有無に左右されない） */
     .input-display-row {
         display: flex;
-        align-items: baseline;
+        align-items: flex-end;
         justify-content: center;
         gap: 8px;
         margin-top: 10px;
