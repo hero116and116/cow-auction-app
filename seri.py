@@ -1049,85 +1049,59 @@ render_weight_and_price_tabs()
 # =========================================================
 @st.fragment
 def render_results_tab():
-  top_col1, top_col2 = st.columns([3, 1])
-  with top_col1:
-    st.subheader("📋 セリ結果一覧表示画面")
-  with top_col2:
-    if st.button(
-        "🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True
-    ):
-      st.rerun(scope="fragment")
-
-  # 1. 本日落札した牛一覧
-  my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
-  st.markdown("#### 🏆 本日落札した牛一覧")
-  if my_cows:
-    df_my = pd.DataFrame(my_cows)[[
-        "No",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "体重",
-        "父",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "実際落札額",
-    ]]
-    df_my.columns = [
-        "出場番号",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "当日体重(kg)",
-        "父牛",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "落札額(千円)",
-    ]
-    st.dataframe(df_my, use_container_width=True, hide_index=True)
-  else:
-    st.info("自社落札した牛はまだありません。")
-
-  st.divider()
-
-  # 2. 本日のセリ結果一覧（全頭）
-  st.markdown("#### 📑 本日のセリ結果一覧（全頭）")
-  all_rows = []
-  for c in st.session_state.cows:
-    m = calculate_cow_metrics(c)
-    all_rows.append({
-        "出場番号": c["No"],
-        "性別": c["性別"],
-        "生年月日": c.get("生年月日", "-"),
-        "日齢": c["日齢"],
-        "産次": c.get("産次", "-"),
-        "体重(kg)": c["体重"],
-        "父": c["父"],
-        "母の父": c.get("母の父", "-"),
-        "母の祖父": c.get("母の祖父", "-"),
-        "母の母の祖父": c.get("母の母の祖父", "-"),
-        "摘要": c.get("摘要", "") or "-",
-        "ボーダー(千円)": m["ボーダー価格"],
-        "落札額(千円)": c["実際落札額"],
-        "購入結果": (
-            "自社落札"
-            if c.get("自社落札", False)
-            else ("他社落札" if c["実際落札額"] > 0 else "-")
-        ),
-    })
-  df_all = pd.DataFrame(all_rows)
-  st.dataframe(df_all, use_container_width=True, hide_index=True)
-
-st.divider()
+    top_col1, top_col2 = st.columns([3, 1])
+    with top_col1:
+        st.subheader("📋 セリ結果一覧表示画面")
+    with top_col2:
+        if st.button("🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True):
+            st.rerun(scope="fragment")
+    
+    # 1. 本日落札した牛一覧
+    my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
+    st.markdown("#### 🏆 本日落札した牛一覧")
+    if my_cows:
+        df_my = pd.DataFrame(my_cows)[[
+            "No", "性別", "生年月日", "日齢", "産次", "体重",
+            "父", "母の父", "母の祖父", "母の母の祖父", "摘要", "実際落札額"
+        ]]
+        df_my.columns = [
+            "出場番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
+            "父牛", "母の父", "母の祖父", "母の母の祖父", "摘要", "落札額(千円)"
+        ]
+        st.dataframe(df_my, use_container_width=True, hide_index=True)
+    else:
+        st.info("自社落札した牛はまだありません。")
+        
+    st.divider()
+    
+    # 2. 本日のセリ結果一覧（全頭）
+    st.markdown("#### 📑 本日のセリ結果一覧（全頭）")
+    all_rows = []
+    for c in st.session_state.cows:
+        m = calculate_cow_metrics(c)
+        all_rows.append({
+            "出場番号": c["No"],
+            "性別": c["性別"],
+            "生年月日": c.get("生年月日", "-"),
+            "日齢": c["日齢"],
+            "産次": c.get("産次", "-"),
+            "体重(kg)": c["体重"],
+            "父": c["父"],
+            "母の父": c.get("母の父", "-"),
+            "母の祖父": c.get("母の祖父", "-"),
+            "母の母の祖父": c.get("母の母の祖父", "-"),
+            "摘要": c.get("摘要", "") or "-",
+            "ボーダー(千円)": m["ボーダー価格"],
+            "落札額(千円)": c["実際落札額"],
+            "購入結果": "自社落札" if c.get("自社落札", False) else ("他社落札" if c["実際落札額"] > 0 else "-")
+        })
+    df_all = pd.DataFrame(all_rows)
+    st.dataframe(df_all, use_container_width=True, hide_index=True)
+    
+    st.divider()
     
     # 3. kintone送信・確認リセットフロー
-if st.session_state.get("kintone_sent_success"):
+    if st.session_state.get("kintone_sent_success"):
         st.success("✅ kintoneにデータを正常に送信しました！")
         st.info("💡 入力値をリセットし、次回のセリの準備をします。")
         if st.button("🧹 画面をリセットして次のセリへ", type="primary", use_container_width=True):
@@ -1155,7 +1129,7 @@ if st.session_state.get("kintone_sent_success"):
             st.session_state.input_buffer_p = ""
             st.session_state.metrics_dirty = True
             st.rerun()
-else:
+    else:
         if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
             with st.spinner("kintoneにデータを送信中..."):
                 success, msg = send_to_kintone(st.session_state.cows)
