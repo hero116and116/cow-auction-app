@@ -197,22 +197,27 @@ st.markdown("""
         justify-content: flex-end;
     }
 
-    /* マイナス要素チェック欄：カードとテンキーの間に挟む帯（体重入力画面） */
+    /* マイナス要素チップ（体重入力画面）：
+       新しく別の箱を作らず、ピクトグラム・性別・日齢が入っているカード上部
+       （.card-top）の余白部分に重ねて表示することで、画面が縦長にならない
+       ようにしている（負のmarginでカード下部の空きスペースへ引き上げる） */
     .st-key-negative_factors_area_w {
-        border: 2px solid #1e293b;
-        border-top: none;
-        margin-top: -16px;
-        padding: 10px 14px 4px 14px;
-        background-color: #ffffff;
+        margin-top: -58px;
+        margin-bottom: 8px;
+        padding: 0 16px;
+        position: relative;
+        z-index: 2;
     }
-    .negative-factors-label {
-        font-size: 12px;
-        font-weight: 700;
-        color: #64748b;
-        margin-bottom: 2px;
+    .st-key-negative_factors_area_w [data-testid="stPills"] {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
     }
-    .st-key-negative_factors_area_w div[data-testid="stCheckbox"] label p {
-        font-size: 13px !important;
+    .st-key-negative_factors_area_w [data-testid="stPills"] button {
+        font-size: 12px !important;
+        padding: 2px 10px !important;
+        min-height: 28px !important;
+        height: 28px !important;
     }
 
     /* テンキー全体を囲むコンテナ：カード下段として視覚的につなげる */
@@ -478,12 +483,12 @@ if "cows" not in st.session_state:
         {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "生年月日": "-", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False, "マイナス要素": []}
         for i in range(1, 31)
     ]
-if "curr_idx_w" not in st.session_state:
-    st.session_state.curr_idx_w = 0
-if "curr_idx_p" not in st.session_state:
-    st.session_state.curr_idx_p = 0
-if "input_buffer" not in st.session_state:
-    st.session_state.input_buffer = ""
+if "curr_idx" not in st.session_state:
+    st.session_state.curr_idx = 0
+if "input_buffer_w" not in st.session_state:
+    st.session_state.input_buffer_w = ""
+if "input_buffer_p" not in st.session_state:
+    st.session_state.input_buffer_p = ""
 
 # --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
@@ -522,9 +527,9 @@ with tab1:
                     r["自社落札"] = False
                     r["マイナス要素"] = []
                 st.session_state.cows = parsed
-                st.session_state.curr_idx_w = 0
-                st.session_state.curr_idx_p = 0
-                st.session_state.input_buffer = ""
+                st.session_state.curr_idx = 0
+                st.session_state.input_buffer_w = ""
+                st.session_state.input_buffer_p = ""
                 st.session_state.just_parsed_count = len(parsed)
                 st.toast("読み取りが完了しました！", icon="✅")
                 st.rerun()
@@ -532,7 +537,6 @@ with tab1:
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
-@st.fragment
 def render_weight_tab():
     total = len(st.session_state.cows)
     idx = st.session_state.curr_idx_w
@@ -573,23 +577,24 @@ def render_weight_tab():
         '</div>'
         '</div>'
         '<div class="card-divider"></div>'
-        '<div class="card-bottom" id="numpad-anchor-w"></div>'
         '</div>'
     )
     st.markdown(card_html_w, unsafe_allow_html=True)
 
-    # 2.5 マイナス要素チェック（該当する場合のみチェックを入れる）
+    # 2.5 マイナス要素チェック（該当する場合のみ選択）
+    # ピクトグラム・性別・日齢が入っているカード本体の余白部分に収まるよう、
+    # チップ形式（st.pills）で1行にまとめ、上に重ねて表示する（別枠の箱を増やさない）
     with st.container(key="negative_factors_area_w"):
-        st.markdown('<div class="negative-factors-label">▼ マイナス要素（該当する項目のみチェック）</div>', unsafe_allow_html=True)
         current_negs = cow.get("マイナス要素", [])
-        new_negs = []
-        cols_neg = st.columns(2)
-        for i, factor in enumerate(NEGATIVE_FACTORS):
-            with cols_neg[i % 2]:
-                checked = st.checkbox(factor, value=(factor in current_negs), key=f"neg_{i}_{idx}")
-                if checked:
-                    new_negs.append(factor)
-        st.session_state.cows[idx]["マイナス要素"] = new_negs
+        selected_negs = st.pills(
+            "マイナス要素（該当する場合のみ選択）",
+            options=NEGATIVE_FACTORS,
+            selection_mode="multi",
+            default=[f for f in current_negs if f in NEGATIVE_FACTORS],
+            key=f"neg_pills_{idx}",
+            label_visibility="collapsed",
+        )
+        st.session_state.cows[idx]["マイナス要素"] = list(selected_negs) if selected_negs else []
 
     # 3. テンキー & 左右移動ボタン（カード下段を模したグリッド）
     with st.container(key="numpad_area_w"):
@@ -634,12 +639,10 @@ def render_weight_tab():
                 st.rerun(scope="fragment")
 
 
-with tab2:
-    render_weight_tab()
+
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
-@st.fragment
 def render_price_tab():
     total = len(st.session_state.cows)
     idx = st.session_state.curr_idx_p
@@ -746,8 +749,17 @@ def render_price_tab():
                 st.rerun(scope="fragment")
 
 
-with tab3:
-    render_price_tab()
+@st.fragment
+def render_weight_and_price_tabs():
+    # 体重タブと落札価格タブを同一フラグメントにまとめることで、
+    # 体重入力側の変更（体重・マイナス要素など）がタブ切替時に
+    # 即座に落札価格タブへ反映されるようにする（ラグ・反映漏れの解消）
+    with tab2:
+        render_weight_tab()
+    with tab3:
+        render_price_tab()
+
+render_weight_and_price_tabs()
 # =========================================================
 # 画面4: セリ結果一覧表示画面
 # =========================================================
