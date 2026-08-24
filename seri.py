@@ -1127,34 +1127,41 @@ def render_results_tab():
   st.divider()
 
     # 3. kintone送信ボタン
+# 3. kintone送信ボタン
 if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
     with st.spinner("kintoneにデータを送信中..."):
         success, msg = send_to_kintone(st.session_state.cows)
         if success:
             st.success(msg)
                 
-            # ① バックアップファイルを消去
+                # ① バックアップファイルを削除
             clear_backup()
                 
-                # ② メモリ上の牛データをリセット（体重・落札額・マイナス要素・自社落札を初期化）
+                # ② 名簿のベース情報（番号・血統など）だけ残し、入力した数値・チェックを初期化
+            clean_cows = []
             for c in st.session_state.cows:
-                c["体重"] = 0
-                c["実際落札額"] = 0
-                c["自社落札"] = False
-                c["マイナス要素"] = []
+                new_c = c.copy()
+                new_c["体重"] = 0
+                new_c["実際落札額"] = 0
+                new_c["自社落札"] = False
+                new_c["マイナス要素"] = []
+                clean_cows.append(new_c)
                 
-                # ③ 入力バッファやインデックス、キャッシュも初期化
-                st.session_state.input_buffer_w = ""
-                st.session_state.input_buffer_p = ""
-                st.session_state.curr_idx_w = 0
-                st.session_state.curr_idx_p = 0
-                st.session_state.metrics_dirty = True
+                # ③ ウィジェットの内部状態（チェックボックスやpillsのキャッシュ）を全消去
+            st.session_state.clear()
                 
-                st.toast("入力データを初期化しました 🧹", icon="✅")
-                # ページ全体をリロードして入力画面に即時反映
-                st.rerun()
-            else:
-                st.error(msg)
+                # ④ クリーンな初期状態を再セット
+            st.session_state.cows = clean_cows
+            st.session_state.curr_idx_w = 0
+            st.session_state.curr_idx_p = 0
+            st.session_state.input_buffer_w = ""
+            st.session_state.input_buffer_p = ""
+            st.session_state.metrics_dirty = True
+                
+            st.toast("入力データを完全に初期化しました 🧹", icon="✅")
+            st.rerun()
+        else:
+            st.error(msg)
 
 
 with tab4:
