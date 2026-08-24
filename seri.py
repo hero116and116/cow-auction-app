@@ -543,8 +543,13 @@ if "curr_idx_w" not in st.session_state:
     st.session_state.curr_idx_w = 0
 if "curr_idx_p" not in st.session_state:
     st.session_state.curr_idx_p = 0
-if "input_buffer" not in st.session_state:
-    st.session_state.input_buffer = ""
+# 体重入力画面と落札額入力画面はテンキーの入力バッファを別々に持つ
+# （1つの変数を共用すると、片方で入力中の数字がもう片方にも
+#  表示・確定されてしまうバグの原因になるため、必ず分離する）
+if "input_buffer_w" not in st.session_state:
+    st.session_state.input_buffer_w = ""
+if "input_buffer_p" not in st.session_state:
+    st.session_state.input_buffer_p = ""
 
 # --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
@@ -585,7 +590,8 @@ with tab1:
                 st.session_state.cows = parsed
                 st.session_state.curr_idx_w = 0
                 st.session_state.curr_idx_p = 0
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_w = ""
+                st.session_state.input_buffer_p = ""
                 st.session_state.just_parsed_count = len(parsed)
                 st.toast("読み取りが完了しました！", icon="✅")
                 st.rerun()
@@ -609,16 +615,16 @@ def render_weight_tab():
             if st.button("この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True):
                 target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
                 if target_idx is not None:
-                    if st.session_state.input_buffer:
-                        st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
+                    if st.session_state.input_buffer_w:
+                        st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
                     st.session_state.curr_idx_w = target_idx
-                    st.session_state.input_buffer = ""
+                    st.session_state.input_buffer_w = ""
                     st.rerun(scope="fragment")
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
 
     # 2. 上部：牛シルエット＆入力表示（モックアップの「体重入力画面」上段）
-    display_w = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["体重"]) if cow["体重"] > 0 else "")
+    display_w = st.session_state.input_buffer_w if st.session_state.input_buffer_w != "" else (str(cow["体重"]) if cow["体重"] > 0 else "")
 
     card_html_w = (
         '<div class="screen-card">'
@@ -662,18 +668,18 @@ def render_weight_tab():
 
         with col_l:
             if st.button("←", key="prev_w", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
+                if st.session_state.input_buffer_w:
+                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
                 st.session_state.curr_idx_w = max(0, idx - 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
 
         with col_r:
             if st.button("→", key="next_w", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
+                if st.session_state.input_buffer_w:
+                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
 
         with col_pad:
@@ -681,21 +687,21 @@ def render_weight_tab():
                 cols = st.columns(3)
                 for i, num in enumerate(row_nums):
                     if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
-                        st.session_state.input_buffer += num
+                        st.session_state.input_buffer_w += num
                         st.rerun(scope="fragment")
             cols_bottom = st.columns(3)
             if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_w = ""
                 st.session_state.cows[idx]["体重"] = 0
                 st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
-                st.session_state.input_buffer += "0"
+                st.session_state.input_buffer_w += "0"
                 st.rerun(scope="fragment")
             if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer)
+                if st.session_state.input_buffer_w:
+                    st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
 
 
@@ -710,7 +716,7 @@ def render_price_tab():
     calc = calculate_cow_metrics(cow)
     avg_profit = calculate_today_avg_profit()
     
-    display_p = st.session_state.input_buffer if st.session_state.input_buffer != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
+    display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
     # 保存順は基本NEGATIVE_FACTORS順のはずだが、念のため表示時にも
     # 並び順を揃えておく（既存データが古い順番で保存されていた場合の保険）
@@ -730,10 +736,10 @@ def render_price_tab():
             if st.button("この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True):
                 target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
                 if target_idx is not None:
-                    if st.session_state.input_buffer:
-                        st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
+                    if st.session_state.input_buffer_p:
+                        st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
                     st.session_state.curr_idx_p = target_idx
-                    st.session_state.input_buffer = ""
+                    st.session_state.input_buffer_p = ""
                     st.rerun(scope="fragment")
                 else:
                     st.warning("その出場番号は見つかりませんでした。")
@@ -744,7 +750,7 @@ def render_price_tab():
     # まだ未入力なら確定済みの実際落札額を使う。落札額は千円単位で保存されて
     # いるため、円/kgに換算するには1000倍してから体重で割る。
     try:
-        price_for_unit = int(st.session_state.input_buffer) if st.session_state.input_buffer else int(cow["実際落札額"])
+        price_for_unit = int(st.session_state.input_buffer_p) if st.session_state.input_buffer_p else int(cow["実際落札額"])
     except (ValueError, TypeError):
         price_for_unit = 0
     try:
@@ -794,18 +800,18 @@ def render_price_tab():
 
         with col_l:
             if st.button("←", key="prev_p", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
+                if st.session_state.input_buffer_p:
+                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
                 st.session_state.curr_idx_p = max(0, idx - 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
 
         with col_r:
             if st.button("→", key="next_p", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
+                if st.session_state.input_buffer_p:
+                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
                 st.session_state.curr_idx_p = min(total - 1, idx + 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
 
         with col_pad:
@@ -813,21 +819,21 @@ def render_price_tab():
                 cols = st.columns(3)
                 for i, num in enumerate(row_nums):
                     if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
-                        st.session_state.input_buffer += num
+                        st.session_state.input_buffer_p += num
                         st.rerun(scope="fragment")
             cols_bottom = st.columns(3)
             if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_p = ""
                 st.session_state.cows[idx]["実際落札額"] = 0
                 st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
-                st.session_state.input_buffer += "0"
+                st.session_state.input_buffer_p += "0"
                 st.rerun(scope="fragment")
             if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
-                if st.session_state.input_buffer:
-                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer)
+                if st.session_state.input_buffer_p:
+                    st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
                 st.session_state.curr_idx_p = min(total - 1, idx + 1)
-                st.session_state.input_buffer = ""
+                st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
 
 
