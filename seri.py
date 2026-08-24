@@ -550,6 +550,14 @@ if "input_buffer_w" not in st.session_state:
     st.session_state.input_buffer_w = ""
 if "input_buffer_p" not in st.session_state:
     st.session_state.input_buffer_p = ""
+# 「本日の推定平均利益」は全頭ループしてボーダー価格を計算し直す重い処理
+# のため、体重・落札額が確定した時だけ再計算するようキャッシュする
+# （テンキーで数字を打つたびに毎回全頭分再計算されるとラグの原因になる
+#  ため、metrics_dirty フラグが立った時だけ計算し直す）
+if "avg_profit_cache" not in st.session_state:
+    st.session_state.avg_profit_cache = 0
+if "metrics_dirty" not in st.session_state:
+    st.session_state.metrics_dirty = True
 
 # --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
@@ -588,6 +596,7 @@ with tab1:
                     r["自社落札"] = False
                     r["マイナス要素"] = []
                 st.session_state.cows = parsed
+                st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_w = 0
                 st.session_state.curr_idx_p = 0
                 st.session_state.input_buffer_w = ""
@@ -617,6 +626,7 @@ def render_weight_tab():
                 if target_idx is not None:
                     if st.session_state.input_buffer_w:
                         st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
+                        st.session_state.metrics_dirty = True
                     st.session_state.curr_idx_w = target_idx
                     st.session_state.input_buffer_w = ""
                     st.rerun(scope="fragment")
@@ -670,6 +680,7 @@ def render_weight_tab():
             if st.button("←", key="prev_w", use_container_width=True):
                 if st.session_state.input_buffer_w:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
+                    st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_w = max(0, idx - 1)
                 st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
@@ -678,6 +689,7 @@ def render_weight_tab():
             if st.button("→", key="next_w", use_container_width=True):
                 if st.session_state.input_buffer_w:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
+                    st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
@@ -693,6 +705,7 @@ def render_weight_tab():
             if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
                 st.session_state.input_buffer_w = ""
                 st.session_state.cows[idx]["体重"] = 0
+                st.session_state.metrics_dirty = True
                 st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
                 st.session_state.input_buffer_w += "0"
@@ -700,6 +713,7 @@ def render_weight_tab():
             if cols_bottom[2].button("決定", key="btn_w_enter", use_container_width=True):
                 if st.session_state.input_buffer_w:
                     st.session_state.cows[idx]["体重"] = float(st.session_state.input_buffer_w)
+                    st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_w = min(total - 1, idx + 1)
                 st.session_state.input_buffer_w = ""
                 st.rerun(scope="fragment")
@@ -714,7 +728,10 @@ def render_price_tab():
     idx = st.session_state.curr_idx_p
     cow = st.session_state.cows[idx]
     calc = calculate_cow_metrics(cow)
-    avg_profit = calculate_today_avg_profit()
+    if st.session_state.metrics_dirty:
+        st.session_state.avg_profit_cache = calculate_today_avg_profit()
+        st.session_state.metrics_dirty = False
+    avg_profit = st.session_state.avg_profit_cache
     
     display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
 
@@ -738,6 +755,7 @@ def render_price_tab():
                 if target_idx is not None:
                     if st.session_state.input_buffer_p:
                         st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                        st.session_state.metrics_dirty = True
                     st.session_state.curr_idx_p = target_idx
                     st.session_state.input_buffer_p = ""
                     st.rerun(scope="fragment")
@@ -746,11 +764,13 @@ def render_price_tab():
 
     # 2. 上部：特徴（マイナス要素）・牛シルエット・日齢・体重・推定ボーダー・推定利益
     # DGは calculate_cow_metrics() が既に算出したものを利用する（(体重-生時体重)/日齢）。
-    # kgあたり単価は「入力中（テンキー入力中）の落札額」があればそれを優先し、
-    # まだ未入力なら確定済みの実際落札額を使う。落札額は千円単位で保存されて
-    # いるため、円/kgに換算するには1000倍してから体重で割る。
+    # kgあたり単価は、テンキー入力中の値ではなく確定済みの実際落札額のみを
+    # 見て計算する。こうすることで、決定ボタンか矢印ボタンが押されて
+    # 「実際落札額」が確定したタイミングでしか値が変わらなくなる
+    # （数字を打つたびに変動しない）。落札額は千円単位で保存されているため、
+    # 円/kgに換算するには1000倍してから体重で割る。
     try:
-        price_for_unit = int(st.session_state.input_buffer_p) if st.session_state.input_buffer_p else int(cow["実際落札額"])
+        price_for_unit = int(cow["実際落札額"])
     except (ValueError, TypeError):
         price_for_unit = 0
     try:
@@ -793,6 +813,7 @@ def render_price_tab():
     with st.container(key="purchase_check_area_p"):
         purchased = st.checkbox("購入チェック", value=cow["自社落札"], key=f"buy_check_{idx}")
         st.session_state.cows[idx]["自社落札"] = purchased
+        st.session_state.metrics_dirty = True
 
     # 4. テンキー & 左右移動
     with st.container(key="numpad_area_p"):
@@ -802,6 +823,7 @@ def render_price_tab():
             if st.button("←", key="prev_p", use_container_width=True):
                 if st.session_state.input_buffer_p:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                    st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_p = max(0, idx - 1)
                 st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
@@ -810,6 +832,7 @@ def render_price_tab():
             if st.button("→", key="next_p", use_container_width=True):
                 if st.session_state.input_buffer_p:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                    st.session_state.metrics_dirty = True
                 st.session_state.curr_idx_p = min(total - 1, idx + 1)
                 st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
@@ -825,14 +848,17 @@ def render_price_tab():
             if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
                 st.session_state.input_buffer_p = ""
                 st.session_state.cows[idx]["実際落札額"] = 0
+                st.session_state.metrics_dirty = True
                 st.rerun(scope="fragment")
             if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
                 st.session_state.input_buffer_p += "0"
                 st.rerun(scope="fragment")
             if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
+                # 決定ボタンは入力の確定のみ行い、次の牛へは進まない
+                # （画面遷移は←→矢印ボタンの役目）
                 if st.session_state.input_buffer_p:
                     st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.curr_idx_p = min(total - 1, idx + 1)
+                    st.session_state.metrics_dirty = True
                 st.session_state.input_buffer_p = ""
                 st.rerun(scope="fragment")
 
