@@ -483,12 +483,12 @@ if "cows" not in st.session_state:
         {"No": i, "体重": 0, "実際落札額": 0, "性別": "去", "生年月日": "-", "日齢": 280, "産次": 1, "父": "福勝鶴", "母の父": "美津照重", "母の祖父": "平茂勝", "母の母の祖父": "-", "摘要": "", "自社落札": False, "マイナス要素": []}
         for i in range(1, 31)
     ]
-if "curr_idx" not in st.session_state:
-    st.session_state.curr_idx = 0
-if "input_buffer_w" not in st.session_state:
-    st.session_state.input_buffer_w = ""
-if "input_buffer_p" not in st.session_state:
-    st.session_state.input_buffer_p = ""
+if "curr_idx_w" not in st.session_state:
+    st.session_state.curr_idx_w = 0
+if "curr_idx_p" not in st.session_state:
+    st.session_state.curr_idx_p = 0
+if "input_buffer" not in st.session_state:
+    st.session_state.input_buffer = ""
 
 # --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
@@ -527,9 +527,9 @@ with tab1:
                     r["自社落札"] = False
                     r["マイナス要素"] = []
                 st.session_state.cows = parsed
-                st.session_state.curr_idx = 0
-                st.session_state.input_buffer_w = ""
-                st.session_state.input_buffer_p = ""
+                st.session_state.curr_idx_w = 0
+                st.session_state.curr_idx_p = 0
+                st.session_state.input_buffer = ""
                 st.session_state.just_parsed_count = len(parsed)
                 st.toast("読み取りが完了しました！", icon="✅")
                 st.rerun()
