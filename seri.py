@@ -150,18 +150,33 @@ st.markdown("""
         text-align: center;
     }
 
-    /* 落札価格入力画面：牛の特徴（マイナス要素）バッジ */
-    .cow-neg-factors { margin-bottom: 8px; }
+    /* 落札価格入力画面：牛の特徴（マイナス要素）バッジ
+       カードが縦に伸びすぎないよう、行として確保するのではなく
+       牛ピクトグラムの左上（購入チェックの右上表示と対の位置）に
+       小さく重ねて表示する */
+    .cow-neg-factors {
+        position: absolute;
+        top: 12px;
+        left: 14px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        max-width: 76px;
+        z-index: 2;
+    }
     .neg-badge {
         display: inline-block;
         background-color: #fff7ed;
         color: #c2410c;
         border: 1px solid #fdba74;
-        border-radius: 10px;
-        font-size: 12px;
+        border-radius: 6px;
+        font-size: 9.5px;
         font-weight: 700;
-        padding: 2px 8px;
-        margin: 2px 4px 0 0;
+        padding: 1px 5px;
+        line-height: 1.3;
+        white-space: normal;
+        word-break: keep-all;
     }
 
     /* No.X クリックで牛を切り替えるジャンプボタン */
@@ -197,29 +212,41 @@ st.markdown("""
         justify-content: flex-end;
     }
 
-    /* マイナス要素チップ（体重入力画面）：カードとテンキーの間に挟む帯として
-       表示する。以前は負のmarginでカード上部の余白に重ねていたが、
-       選択項目数によって2行に折り返るとボックス外にはみ出す事故が
-       起きたため、通常のレイアウト（内容量に応じて自動で高さが伸びる）
-       に変更し、必ず枠内に収まるようにしている */
+    /* マイナス要素チップ（体重入力画面）：牛のピクトグラム・性別・日齢・
+       体重が表示される上側の枠（screen-card）と二重線が出ないよう境界を
+       重ねて、見た目上は同じ1つの四角の中に収まっているように見せる。
+       高さは選択状態や折り返しに関わらず常に固定（テンキーの位置が
+       入力のたびに上下すると連続入力しづらくなるため）。折り返みは
+       禁止し、収まりきらない場合は横スクロールで対応する（縦にはみ
+       出さない＝以前の絶対配置での事故を避けつつ高さを固定できる） */
     .st-key-negative_factors_area_w {
         border: 2px solid #1e293b;
         border-top: none;
         margin-top: -16px;
-        padding: 10px 14px;
+        padding: 6px 12px;
         background-color: #ffffff;
+        height: 40px;
+        box-sizing: border-box;
+        overflow: hidden;
     }
     .st-key-negative_factors_area_w [data-testid="stPills"] {
         display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 6px;
+        justify-content: flex-start;
+        align-items: center;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 5px;
+        height: 100%;
+        -webkit-overflow-scrolling: touch;
     }
     .st-key-negative_factors_area_w [data-testid="stPills"] button {
-        font-size: 12px !important;
-        padding: 2px 10px !important;
-        min-height: 28px !important;
-        height: 28px !important;
+        font-size: 11px !important;
+        padding: 1px 9px !important;
+        min-height: 26px !important;
+        height: 26px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
     }
 
     /* テンキー全体を囲むコンテナ：カード下段として視覚的につなげる */
@@ -578,13 +605,13 @@ def render_weight_tab():
         f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父: <b>{cow["父"]}</b>'
         '</div>'
         '</div>'
-        '<div class="card-divider"></div>'
         '</div>'
     )
     st.markdown(card_html_w, unsafe_allow_html=True)
 
     # 2.5 マイナス要素チェック（該当する場合のみ選択）
-    # カードとテンキーの間の帯として表示（枠内に確実に収まる自動高さレイアウト）
+    # 上のscreen-card（ピクトグラム・性別・日齢・体重）と境界線を重ねて
+    # 消しているため、見た目上は同じ四角の中に収まって見える
     with st.container(key="negative_factors_area_w"):
         current_negs = cow.get("マイナス要素", [])
         selected_negs = st.pills(
@@ -655,7 +682,8 @@ def render_price_tab():
 
     neg_factors = cow.get("マイナス要素", [])
     neg_badges_html = "".join(f'<span class="neg-badge">{n}</span>' for n in neg_factors)
-    neg_line_html = f'<div class="cow-neg-factors">特徴: {neg_badges_html}</div>' if neg_factors else ""
+    # 縦に長くならないよう、行として確保せず牛ピクトグラムの左上に重ねて表示する
+    neg_corner_html = f'<div class="cow-neg-factors">{neg_badges_html}</div>' if neg_factors else ""
 
     # 1. No.Xをクリックすると番号を直接入力して任意の牛へ移動できる
     with st.container(key="no_jump_p"):
@@ -680,7 +708,7 @@ def render_price_tab():
     card_html_p = (
         '<div class="screen-card">'
         '<div class="card-top">'
-        f'{neg_line_html}'
+        f'{neg_corner_html}'
         f'{get_cow_svg(cow["No"])}'
         '<div class="cow-meta">'
         f'日齢: <b>{cow["日齢"]}日</b><br>'
