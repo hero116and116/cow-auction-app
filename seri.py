@@ -791,7 +791,7 @@ def render_price_tab():
         f'体重: <b>{cow["体重"]}kg</b><br>'
         f'父: <b>{cow["父"]}</b><br>'
         f'DG: <b>{calc["DG"]}kg/日</b><br>'
-        f'kgあたり単価: <b>{unit_price_text}</b><br>'
+        f'単価: <b>{unit_price_text}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
         '</div>'
