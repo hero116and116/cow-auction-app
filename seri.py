@@ -851,8 +851,24 @@ render_weight_and_price_tabs()
 # =========================================================
 # 画面4: セリ結果一覧表示画面
 # =========================================================
-with tab4:
-    st.subheader("📋 セリ結果一覧表示画面")
+# 体重・落札額タブの入力は @st.fragment 内で完結する「フラグメント単位の
+# 再実行」で処理されており、画面全体（この画面4を含む）は再実行されない。
+# そのため画面4をフラグメントの外に置いたままだと、体重や落札額を入力
+# しても一覧に反映されるのは何かページ全体が再実行された時だけになり、
+# 「反映がとても遅い」ように見えてしまう。
+# 画面4自体も専用のフラグメントにし、手動の「🔄 今すぐ更新」ボタンで
+# その場で再計算・再描画できるようにする（run_everyによる自動ポーリング
+# は行わない：体重・落札額タブ側のフラグメントと処理が競合し、
+# テンキーの反応にラグが出るのを避けるため）。
+@st.fragment
+def render_results_tab():
+    top_col1, top_col2 = st.columns([3, 1])
+    with top_col1:
+        st.subheader("📋 セリ結果一覧表示画面")
+    with top_col2:
+        # タップした瞬間にこのフラグメントだけを再実行して最新の状態を反映する
+        if st.button("🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True):
+            st.rerun(scope="fragment")
     
     # 1. 本日落札した牛一覧
     my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
@@ -906,3 +922,6 @@ with tab4:
                 st.success(msg)
             else:
                 st.error(msg)
+
+with tab4:
+    render_results_tab()
