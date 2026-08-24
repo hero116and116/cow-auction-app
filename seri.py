@@ -715,6 +715,21 @@ def render_price_tab():
                     st.warning("その出場番号は見つかりませんでした。")
 
     # 2. 上部：特徴（マイナス要素）・牛シルエット・日齢・体重・推定ボーダー・推定利益
+    # DGは calculate_cow_metrics() が既に算出したものを利用する（(体重-生時体重)/日齢）。
+    # kgあたり単価は「入力中（テンキー入力中）の落札額」があればそれを優先し、
+    # まだ未入力なら確定済みの実際落札額を使う。落札額は千円単位で保存されて
+    # いるため、円/kgに換算するには1000倍してから体重で割る。
+    try:
+        price_for_unit = int(st.session_state.input_buffer) if st.session_state.input_buffer else int(cow["実際落札額"])
+    except (ValueError, TypeError):
+        price_for_unit = 0
+    try:
+        weight_for_unit = float(cow["体重"])
+    except (ValueError, TypeError):
+        weight_for_unit = 0
+    unit_price = int(round(price_for_unit * 1000 / weight_for_unit)) if weight_for_unit > 0 and price_for_unit > 0 else 0
+    unit_price_text = f'{unit_price:,}円/kg' if unit_price > 0 else "-"
+
     card_html_p = (
         '<div class="screen-card">'
         '<div class="card-top">'
@@ -724,6 +739,8 @@ def render_price_tab():
         f'日齢: <b>{cow["日齢"]}日</b><br>'
         f'体重: <b>{cow["体重"]}kg</b><br>'
         f'父: <b>{cow["父"]}</b><br>'
+        f'DG: <b>{calc["DG"]}kg/日</b><br>'
+        f'kgあたり単価: <b>{unit_price_text}</b><br>'
         f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
         '</div>'
         '<div class="cow-metrics">'
