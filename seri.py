@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from streamlit.components.v1 import html as st_html
 
 # --- 牛のピクトグラム画像（Base64形式） ---
 COW_ICON_B64 = (
@@ -79,6 +80,74 @@ st.set_page_config(
     page_icon="🐄",
     layout="centered",
 )
+
+# --- 通信切断検知バナー ---
+# 画面を3分以上バックグラウンド（非表示）にしていた場合、次に画面へ
+# 戻ってきたタイミングで「通信が切れているかもしれません」というバナーを
+# 画面上部に表示し、ワンタップで再読み込みできるようにする。
+_DISCONNECT_WATCHER_HTML = """
+<script>
+(function() {
+  const doc = window.parent.document;
+  const THRESHOLD_MS = 3 * 60 * 1000; // 3分
+
+  if (!doc.getElementById('seri-disconnect-banner')) {
+    const banner = doc.createElement('div');
+    banner.id = 'seri-disconnect-banner';
+    banner.style.cssText = [
+      'display:none',
+      'position:fixed',
+      'top:0', 'left:0', 'right:0',
+      'z-index:999999',
+      'background-color:#f97316',
+      'color:#ffffff',
+      'padding:10px 14px',
+      'font-size:14px',
+      'font-weight:600',
+      'text-align:center',
+      'box-shadow:0 2px 6px rgba(0,0,0,0.25)',
+      'align-items:center',
+      'justify-content:center',
+      'gap:10px',
+      'flex-wrap:wrap'
+    ].join(';');
+    banner.innerHTML =
+      '<span>\u26a0\ufe0f しばらく操作がなかったため、通信が切れている可能性があります</span>' +
+      '<button id="seri-disconnect-reload" style="background:#ffffff;color:#c2410c;border:none;border-radius:4px;padding:6px 12px;font-weight:700;cursor:pointer;">\ud83d\udd04 今すぐ再読み込み</button>' +
+      '<button id="seri-disconnect-close" style="background:transparent;color:#ffffff;border:none;font-size:18px;cursor:pointer;">\u2715</button>';
+    doc.body.appendChild(banner);
+
+    doc.getElementById('seri-disconnect-reload').addEventListener('click', function() {
+      window.parent.location.reload();
+    });
+    doc.getElementById('seri-disconnect-close').addEventListener('click', function() {
+      banner.style.display = 'none';
+    });
+  }
+
+  if (!window.parent.__seriVisibilityWatcherAttached) {
+    window.parent.__seriVisibilityWatcherAttached = true;
+    window.parent.__seriHiddenAt = null;
+
+    doc.addEventListener('visibilitychange', function() {
+      if (doc.visibilityState === 'hidden') {
+        window.parent.__seriHiddenAt = Date.now();
+      } else if (doc.visibilityState === 'visible') {
+        const hiddenAt = window.parent.__seriHiddenAt;
+        if (hiddenAt && (Date.now() - hiddenAt) > THRESHOLD_MS) {
+          const b = doc.getElementById('seri-disconnect-banner');
+          if (b) {
+            b.style.display = 'flex';
+          }
+        }
+        window.parent.__seriHiddenAt = null;
+      }
+    });
+  }
+})();
+</script>
+"""
+st_html(_DISCONNECT_WATCHER_HTML, height=0, width=0)
 
 # --- マイナス要素の項目一覧 ---
 NEGATIVE_FACTORS = [
