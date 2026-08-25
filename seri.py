@@ -3,6 +3,7 @@ import os
 import textwrap
 from google import genai
 from google.genai import types
+import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
@@ -485,6 +486,30 @@ with st.sidebar:
     st.rerun()
 
 
+# --- 成長曲線パラメータ（牧場実績データ2000件超からフィッティング済み） ---
+# モデル: logistic(t) = A / (1 + B * exp(-k * t))
+GROWTH_CURVE_PARAMS = {
+    "雌": {"A": 734.258662, "B": 9.925742, "k": 0.005825},
+    "去": {"A": 791.207131, "B": 9.810946, "k": 0.005967},
+    "全体": {"A": 739.731502, "B": 10.204743, "k": 0.005949},
+}
+
+
+def logistic_weight(t, A, B, k):
+  """日齢tにおける成長曲線上の理論体重(kg)"""
+  return A / (1 + B * np.exp(-k * t))
+
+
+def logistic_dg(t, A, B, k):
+  """日齢tにおける成長曲線の瞬間傾き＝推定DG(kg/日)"""
+  return (A * B * k * np.exp(-k * t)) / ((1 + B * np.exp(-k * t)) ** 2)
+
+
+def get_growth_params(gender):
+  """性別文字列から成長曲線パラメータを取得（不明な場合は「全体」にフォールバック）"""
+  return GROWTH_CURVE_PARAMS.get(gender, GROWTH_CURVE_PARAMS["全体"])
+
+
 # --- 計算ロジック ---
 def calculate_cow_metrics(cow_row):
   try:
@@ -505,10 +530,24 @@ def calculate_cow_metrics(cow_row):
         "目標落札額": 0,
     }
 
+  # DG（表示用）は従来通り、生時体重からの平均日増体量
   dg = (weight - birth_weight) / days
+
   raising_days = max(0, shipment_days - days)
   cost = int(raising_days * daily_cost)
-  pred_ship_weight = weight + (dg * raising_days)
+
+  # 予測出荷体重だけは成長曲線（非線形・ロジスティックモデル）で算出
+  params = get_growth_params(cow_row.get("性別", "全体"))
+  A, B, k = params["A"], params["B"], params["k"]
+
+  # 成長曲線上の理論体重と実測体重とのズレをオフセットとして保持し、
+  # 曲線の「形」はそのままにこの牛の実測値に位置合わせする
+  offset = weight - logistic_weight(days, A, B, k)
+
+  # 出荷日齢時点の曲線上の理論体重にオフセットを加えて予測出荷体重とする
+  # （万一曲線が下降してもオフセット後に現体重を下回らないようガード）
+  pred_ship_weight = max(weight, logistic_weight(shipment_days, A, B, k) + offset)
+
   pred_carcass_weight = pred_ship_weight * yield_rate
   sales = int(pred_carcass_weight * carcass_price)
   border_price = max(0, (sales - cost) // 1000)
