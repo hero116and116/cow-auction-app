@@ -903,7 +903,6 @@ def render_weight_tab():
           )
           st.session_state.metrics_dirty = True
           save_backup()
-        st.session_state.curr_idx_w = min(total - 1, idx + 1)
         st.session_state.input_buffer_w = ""
         st.rerun(scope="fragment")
 
