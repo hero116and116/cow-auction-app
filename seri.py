@@ -1242,10 +1242,10 @@ def render_results_tab():
             # 次の世代番号を記録
             next_reset_ver = st.session_state.get("reset_ver", 0) + 1
             
-            # ③ ウィジェットの内部状態を全消去
-            st.session_state.clear()
-            
-            # ④ クリーンな状態を再セット
+            # ③ 必要なキーだけを個別にリセット
+            #    ※ st.session_state.clear() は使わない。フラグメント
+            #    （@st.fragment）が内部で使うキーまで消してしまい、
+            #    結果一覧タブなどの表示が正しく更新されなくなるため。
             st.session_state.reset_ver = next_reset_ver
             st.session_state.cows = clean_cows
             st.session_state.curr_idx_w = 0
@@ -1253,6 +1253,7 @@ def render_results_tab():
             st.session_state.input_buffer_w = ""
             st.session_state.input_buffer_p = ""
             st.session_state.metrics_dirty = True
+            st.session_state.kintone_sent_success = False
             st.rerun()
     else:
         if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
