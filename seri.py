@@ -479,6 +479,26 @@ with st.sidebar:
   yield_rate = st.number_input("歩留基準 (0.65 = 65%)", value=0.65, step=0.01)
   target_profit = st.number_input("目標利益 (千円)", value=100, step=10)
 
+  # 設定値が前回から変わっていたら自動で再計算フラグを立てる
+  current_settings = (
+      carcass_price,
+      daily_cost,
+      shipment_days,
+      birth_weight,
+      yield_rate,
+      target_profit,
+  )
+  if st.session_state.get("last_settings") != current_settings:
+    st.session_state.last_settings = current_settings
+    st.session_state.metrics_dirty = True
+
+  if st.button(
+      "💾 設定を保存", use_container_width=True, type="primary"
+  ):
+    st.session_state.metrics_dirty = True
+    st.toast("設定を保存し、再計算しました ✅", icon="💾")
+    st.rerun()
+
   st.divider()
   if st.button("🗑️ 作業データを全初期化", use_container_width=True):
     clear_backup()
