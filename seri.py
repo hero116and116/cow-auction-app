@@ -469,14 +469,15 @@ if not st.session_state.sidebar_open:
 # --- サイドバー設定 ---
 # 確定済みの設定値は st.session_state に保持する（保存を押すまでは古い値のまま計算に使う）
 if "settings" not in st.session_state:
-  st.session_state.settings = {
-      "carcass_price": 2500,
-      "daily_cost": 850,
-      "shipment_days": 854,
-      "birth_weight": 35.0,
-      "yield_rate": 0.65,
-      "target_profit": 100,
-  }
+    st.session_state.settings = {
+        "carcass_price": 2300,
+        "daily_cost": 850,
+        "shipment_days": 854,
+        "birth_weight": 35.0,
+        "yield_rate_mc": 0.645,  # 去勢歩留 (64.5%)
+        "yield_rate_f": 0.625,   # 雌歩留 (62.5%)
+        "target_profit": 100
+    }
 
 with st.sidebar:
   if st.button("✕ 閉じる", key="close_sidebar_btn", use_container_width=True):
@@ -507,12 +508,23 @@ with st.sidebar:
       step=1.0,
       key="input_birth_weight",
   )
-  input_yield_rate = st.number_input(
-      "歩留基準 (0.65 = 65%)",
-      value=st.session_state.settings["yield_rate"],
-      step=0.01,
-      key="input_yield_rate",
+
+  # 単一の歩留基準から【去勢】【雌】ごとの入力欄へ分割
+  input_yield_rate_mc = st.number_input(
+      "歩留基準【去勢】",
+      value=st.session_state.settings.get("yield_rate_mc", 0.645),
+      step=0.005,
+      format="%.3f",
+      key="input_yield_rate_mc",
   )
+  input_yield_rate_f = st.number_input(
+      "歩留基準【雌】",
+      value=st.session_state.settings.get("yield_rate_f", 0.625),
+      step=0.005,
+      format="%.3f",
+      key="input_yield_rate_f",
+  )
+
   input_target_profit = st.number_input(
       "目標利益 (千円)",
       value=st.session_state.settings["target_profit"],
@@ -523,14 +535,13 @@ with st.sidebar:
   if st.button(
       "💾 設定を保存", use_container_width=True, type="primary"
   ):
-    # ここで初めて確定値として session_state.settings に書き込む。
-    # これにより「保存」を押したタイミングで確実に再計算対象へ反映される。
     st.session_state.settings = {
         "carcass_price": input_carcass_price,
         "daily_cost": input_daily_cost,
         "shipment_days": input_shipment_days,
         "birth_weight": input_birth_weight,
-        "yield_rate": input_yield_rate,
+        "yield_rate_mc": input_yield_rate_mc,
+        "yield_rate_f": input_yield_rate_f,
         "target_profit": input_target_profit,
     }
     st.session_state.metrics_dirty = True
@@ -570,15 +581,21 @@ def get_growth_params(gender):
 
 # --- 計算ロジック ---
 def calculate_cow_metrics(cow_row):
-  # 「保存」ボタンが押されて確定した設定値のみを使う（st.session_state は
-  # フラグメント経由の再実行でも常に最新かつ一貫した値を返す）
+  # 「保存」ボタンが押されて確定した設定値のみを使う
   settings = st.session_state.settings
   carcass_price = settings["carcass_price"]
   daily_cost = settings["daily_cost"]
   shipment_days = settings["shipment_days"]
   birth_weight = settings["birth_weight"]
-  yield_rate = settings["yield_rate"]
   target_profit = settings["target_profit"]
+
+  # 性別の判定と対応する歩留基準の取得
+  gender_clean = clean_gender(cow_row.get("性別", "去"))
+  yield_rate = (
+      settings.get("yield_rate_f", 0.625)
+      if gender_clean == "雌"
+      else settings.get("yield_rate_mc", 0.645)
+  )
 
   try:
     days = float(cow_row.get("日齢", 0))
@@ -598,24 +615,23 @@ def calculate_cow_metrics(cow_row):
         "目標落札額": 0,
     }
 
-  # DG（表示用）は従来通り、生時体重からの平均日増体量
+  # 生時体重からの平均日増体量 (DG)
   dg = (weight - birth_weight) / days
 
   raising_days = max(0, shipment_days - days)
   cost = int(raising_days * daily_cost)
 
-  # 予測出荷体重だけは成長曲線（非線形・ロジスティックモデル）で算出
-  params = get_growth_params(cow_row.get("性別", "全体"))
+  # 成長曲線（ロジスティックモデル）を用いた出荷時体重の予測
+  params = get_growth_params(gender_clean)
   A, B, k = params["A"], params["B"], params["k"]
 
-  # 成長曲線上の理論体重と実測体重とのズレをオフセットとして保持し、
-  # 曲線の「形」はそのままにこの牛の実測値に位置合わせする
+  # 実測値と曲線上の理論値とのオフセットを保持して外挿
   offset = weight - logistic_weight(days, A, B, k)
+  pred_ship_weight = max(
+      weight, logistic_weight(shipment_days, A, B, k) + offset
+  )
 
-  # 出荷日齢時点の曲線上の理論体重にオフセットを加えて予測出荷体重とする
-  # （万一曲線が下降してもオフセット後に現体重を下回らないようガード）
-  pred_ship_weight = max(weight, logistic_weight(shipment_days, A, B, k) + offset)
-
+  # 性別ごとの歩留を掛けて枝肉重量を算出
   pred_carcass_weight = pred_ship_weight * yield_rate
   sales = int(pred_carcass_weight * carcass_price)
   border_price = max(0, (sales - cost) // 1000)
