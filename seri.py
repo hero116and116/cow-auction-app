@@ -467,34 +467,72 @@ if not st.session_state.sidebar_open:
     st.rerun()
 
 # --- サイドバー設定 ---
+# 確定済みの設定値は st.session_state に保持する（保存を押すまでは古い値のまま計算に使う）
+if "settings" not in st.session_state:
+  st.session_state.settings = {
+      "carcass_price": 2500,
+      "daily_cost": 850,
+      "shipment_days": 854,
+      "birth_weight": 35.0,
+      "yield_rate": 0.65,
+      "target_profit": 100,
+  }
+
 with st.sidebar:
   if st.button("✕ 閉じる", key="close_sidebar_btn", use_container_width=True):
     st.session_state.sidebar_open = False
     st.rerun()
   st.header("⚙️ 共通設定（相場・コスト）")
-  carcass_price = st.number_input("枝肉単価 (円/kg)", value=2500, step=50)
-  daily_cost = st.number_input("1日あたり育成コスト (円)", value=850, step=10)
-  shipment_days = st.number_input("出荷日齢 (日)", value=854, step=1)
-  birth_weight = st.number_input("生時体重 (kg)", value=35.0, step=1.0)
-  yield_rate = st.number_input("歩留基準 (0.65 = 65%)", value=0.65, step=0.01)
-  target_profit = st.number_input("目標利益 (千円)", value=100, step=10)
-
-  # 設定値が前回から変わっていたら自動で再計算フラグを立てる
-  current_settings = (
-      carcass_price,
-      daily_cost,
-      shipment_days,
-      birth_weight,
-      yield_rate,
-      target_profit,
+  input_carcass_price = st.number_input(
+      "枝肉単価 (円/kg)",
+      value=st.session_state.settings["carcass_price"],
+      step=50,
+      key="input_carcass_price",
   )
-  if st.session_state.get("last_settings") != current_settings:
-    st.session_state.last_settings = current_settings
-    st.session_state.metrics_dirty = True
+  input_daily_cost = st.number_input(
+      "1日あたり育成コスト (円)",
+      value=st.session_state.settings["daily_cost"],
+      step=10,
+      key="input_daily_cost",
+  )
+  input_shipment_days = st.number_input(
+      "出荷日齢 (日)",
+      value=st.session_state.settings["shipment_days"],
+      step=1,
+      key="input_shipment_days",
+  )
+  input_birth_weight = st.number_input(
+      "生時体重 (kg)",
+      value=st.session_state.settings["birth_weight"],
+      step=1.0,
+      key="input_birth_weight",
+  )
+  input_yield_rate = st.number_input(
+      "歩留基準 (0.65 = 65%)",
+      value=st.session_state.settings["yield_rate"],
+      step=0.01,
+      key="input_yield_rate",
+  )
+  input_target_profit = st.number_input(
+      "目標利益 (千円)",
+      value=st.session_state.settings["target_profit"],
+      step=10,
+      key="input_target_profit",
+  )
 
   if st.button(
       "💾 設定を保存", use_container_width=True, type="primary"
   ):
+    # ここで初めて確定値として session_state.settings に書き込む。
+    # これにより「保存」を押したタイミングで確実に再計算対象へ反映される。
+    st.session_state.settings = {
+        "carcass_price": input_carcass_price,
+        "daily_cost": input_daily_cost,
+        "shipment_days": input_shipment_days,
+        "birth_weight": input_birth_weight,
+        "yield_rate": input_yield_rate,
+        "target_profit": input_target_profit,
+    }
     st.session_state.metrics_dirty = True
     st.toast("設定を保存し、再計算しました ✅", icon="💾")
     st.rerun()
@@ -532,6 +570,16 @@ def get_growth_params(gender):
 
 # --- 計算ロジック ---
 def calculate_cow_metrics(cow_row):
+  # 「保存」ボタンが押されて確定した設定値のみを使う（st.session_state は
+  # フラグメント経由の再実行でも常に最新かつ一貫した値を返す）
+  settings = st.session_state.settings
+  carcass_price = settings["carcass_price"]
+  daily_cost = settings["daily_cost"]
+  shipment_days = settings["shipment_days"]
+  birth_weight = settings["birth_weight"]
+  yield_rate = settings["yield_rate"]
+  target_profit = settings["target_profit"]
+
   try:
     days = float(cow_row.get("日齢", 0))
     weight = float(cow_row.get("体重", 0))
