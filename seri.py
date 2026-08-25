@@ -85,7 +85,7 @@ st.set_page_config(
 # 画面を3分以上バックグラウンド（非表示）にしていた場合、次に画面へ
 # 戻ってきたタイミングで「通信が切れているかもしれません」というバナーを
 # 画面上部に表示し、ワンタップで再読み込みできるようにする。
-_DISCONNECT_WATCHER_HTML = """
+_DISCONNECT_WATCHER_HTML = r"""
 <script>
 (function() {
   const doc = window.parent.document;
