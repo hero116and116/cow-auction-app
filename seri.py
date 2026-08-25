@@ -960,7 +960,7 @@ def render_price_tab():
       "</div>"
       '<div class="cow-metrics">'
       f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
-      f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
+      f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
       '<div class="input-display-row">'
@@ -1097,7 +1097,7 @@ def render_results_tab():
             "母の祖父": c.get("母の祖父", "-"),
             "母の母の祖父": c.get("母の母の祖父", "-"),
             "摘要": c.get("摘要", "") or "-",
-            "ボーダー(千円)": m["ボーダー価格"],
+            "損益分岐点(千円)": m["ボーダー価格"],
             "落札額(千円)": c["実際落札額"],
             "購入結果": "自社落札" if c.get("自社落札", False) else ("他社落札" if c["実際落札額"] > 0 else "-")
         })
