@@ -953,7 +953,7 @@ def render_weight_tab():
         st.rerun(scope="fragment")
 
     with col_pad:
-      for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
+      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
         cols = st.columns(3)
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
@@ -1125,7 +1125,7 @@ def render_price_tab():
         st.rerun(scope="fragment")
 
     with col_pad:
-      for row_nums in [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]:
+      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
         cols = st.columns(3)
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
