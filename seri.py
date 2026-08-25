@@ -257,6 +257,7 @@ st.markdown(
     }
     .cow-metrics .profit { color: #059669; font-size: 15px; }
     .cow-metrics .border-price { color: #2563eb; font-size: 16px; }
+    .cow-metrics .target-price { color: #dc2626; font-size: 16px; }
 
     .neg-badge {
         display: inline-block;
@@ -475,6 +476,7 @@ with st.sidebar:
   shipment_days = st.number_input("出荷日齢 (日)", value=854, step=1)
   birth_weight = st.number_input("生時体重 (kg)", value=35.0, step=1.0)
   yield_rate = st.number_input("歩留基準 (0.65 = 65%)", value=0.65, step=0.01)
+  target_profit = st.number_input("目標利益 (千円)", value=100, step=10)
 
   st.divider()
   if st.button("🗑️ 作業データを全初期化", use_container_width=True):
@@ -500,6 +502,7 @@ def calculate_cow_metrics(cow_row):
         "予測枝肉重量": 0.0,
         "見込売上": 0,
         "ボーダー価格": 0,
+        "目標落札額": 0,
     }
 
   dg = (weight - birth_weight) / days
@@ -509,6 +512,7 @@ def calculate_cow_metrics(cow_row):
   pred_carcass_weight = pred_ship_weight * yield_rate
   sales = int(pred_carcass_weight * carcass_price)
   border_price = max(0, (sales - cost) // 1000)
+  target_price = max(0, border_price - target_profit)
 
   return {
       "DG": round(dg, 3),
@@ -518,6 +522,7 @@ def calculate_cow_metrics(cow_row):
       "予測枝肉重量": round(pred_carcass_weight, 1),
       "見込売上": sales // 1000,
       "ボーダー価格": border_price,
+      "目標落札額": target_price,
   }
 
 
@@ -955,7 +960,8 @@ def render_price_tab():
       "</div>"
       '<div class="cow-metrics">'
       f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
-      f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)'
+      f'推定ボーダー価格 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
+      f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
       '<div class="input-display-row">'
       f'<span class="input-display">{display_p}</span>'
