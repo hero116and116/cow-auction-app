@@ -539,11 +539,12 @@ if not st.session_state.sidebar_open:
 # 確定済みの設定値は st.session_state に保持する（保存を押すまでは古い値のまま計算に使う）
 if "settings" not in st.session_state:
   st.session_state.settings = {
-      "carcass_price": 2500,
+      "carcass_price": 2300,
       "daily_cost": 850,
       "shipment_days": 854,
       "birth_weight": 35.0,
-      "yield_rate": 0.65,
+      "yield_rate_mc": 0.645,  # 去勢歩留 (64.5%)
+      "yield_rate_f": 0.625,   # 雌歩留 (62.5%)
       "target_profit": 100,
   }
 
@@ -576,11 +577,20 @@ with st.sidebar:
       step=1.0,
       key="input_birth_weight",
   )
-  input_yield_rate = st.number_input(
-      "歩留基準 (0.65 = 65%)",
-      value=st.session_state.settings["yield_rate"],
-      step=0.01,
-      key="input_yield_rate",
+  # 単一の歩留基準から【去勢】【雌】ごとの入力欄へ分割
+  input_yield_rate_mc = st.number_input(
+      "歩留基準【去勢】",
+      value=st.session_state.settings.get("yield_rate_mc", 0.645),
+      step=0.005,
+      format="%.3f",
+      key="input_yield_rate_mc",
+  )
+  input_yield_rate_f = st.number_input(
+      "歩留基準【雌】",
+      value=st.session_state.settings.get("yield_rate_f", 0.625),
+      step=0.005,
+      format="%.3f",
+      key="input_yield_rate_f",
   )
   input_target_profit = st.number_input(
       "目標利益 (千円)",
@@ -599,7 +609,8 @@ with st.sidebar:
         "daily_cost": input_daily_cost,
         "shipment_days": input_shipment_days,
         "birth_weight": input_birth_weight,
-        "yield_rate": input_yield_rate,
+        "yield_rate_mc": input_yield_rate_mc,
+        "yield_rate_f": input_yield_rate_f,
         "target_profit": input_target_profit,
     }
     st.session_state.metrics_dirty = True
@@ -648,7 +659,14 @@ def calculate_cow_metrics(cow_row):
   daily_cost = settings["daily_cost"]
   shipment_days = settings["shipment_days"]
   birth_weight = settings["birth_weight"]
-  yield_rate = settings["yield_rate"]
+
+  # 性別の判定と対応する歩留基準の取得
+  gender_clean = clean_gender(cow_row.get("性別", "去"))
+  yield_rate = (
+      settings.get("yield_rate_f", 0.625)
+      if gender_clean == "雌"
+      else settings.get("yield_rate_mc", 0.645)
+  )
   target_profit = settings["target_profit"]
 
   try:
@@ -676,7 +694,7 @@ def calculate_cow_metrics(cow_row):
   cost = int(raising_days * daily_cost)
 
   # 予測出荷体重だけは成長曲線（非線形・ロジスティックモデル）で算出
-  params = get_growth_params(cow_row.get("性別", "全体"))
+  params = get_growth_params(gender_clean)
   A, B, k = params["A"], params["B"], params["k"]
 
   # 成長曲線上の理論体重と実測体重とのズレをオフセットとして保持し、
@@ -733,8 +751,8 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
 
   prompt = """
     添付された牛のセリ名簿から各行の情報を抽出し、JSON配列として出力してください。
-    キー: No (整数), 性別 (去/雌), 生年月日 (文字列、名簿の表記そのまま。例: R07.11.08), 日齢 (整数), 産次 (整数、無ければ0), 摘要 (文字列), 父 (文字列), 母の父 (文字列), 母の祖父 (文字列), 母の母の祖父 (文字列)
-    ※ 体重・落札額は0にしてください。JSON配列のみを出力してください。
+    キー: No (整数), 個体識別番号 (文字列、10桁の数字、名簿の表記そのまま), 性別 (去/雌), 生年月日 (文字列、名簿の表記そのまま。例: R07.11.08), 日齢 (整数), 産次 (整数、無ければ0), 摘要 (文字列), 父 (文字列), 母の父 (文字列), 母の祖父 (文字列), 母の母の祖父 (文字列)
+    ※ 体重・落札額は0にしてください。個体識別番号が名簿に無い場合は空文字にしてください。JSON配列のみを出力してください。
     """
   response = client.models.generate_content(
       model="gemini-3.6-flash",
@@ -747,6 +765,7 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
   data = json.loads(response.text)
   for r in data:
     r["性別"] = clean_gender(r.get("性別", "去"))
+    r["個体識別番号"] = str(r.get("個体識別番号", "") or "")
   return data
 
 
@@ -759,14 +778,17 @@ def send_to_kintone(cows_list):
   }
 
   records = []
+  settings = st.session_state.settings
   for c in cows_list:
     weight = float(c.get("体重", 0))
     price = int(c.get("実際落札額", 0))
     if weight > 0 or price > 0:
       status = "購入" if c.get("自社落札", False) else "非購入"
       calc = calculate_cow_metrics(c)
+      negs = set(c.get("マイナス要素", []))
       records.append({
           "出場番号": {"value": int(c["No"])},
+          "個体識別番号": {"value": str(c.get("個体識別番号", ""))},
           "当日体重": {"value": weight},
           "日齢": {"value": int(c.get("日齢", 0))},
           "産次": {"value": int(c.get("産次", 0))},
@@ -776,9 +798,21 @@ def send_to_kintone(cows_list):
           "母の父": {"value": str(c.get("母の父", ""))},
           "母の祖父": {"value": str(c.get("母の祖父", ""))},
           "母の母の祖父": {"value": str(c.get("母の母の祖父", ""))},
+          "馬面": {"value": ["該当"] if "馬面" in negs else []},
+          "口が小さい": {"value": ["該当"] if "口が小さい" in negs else []},
+          "尾枕がある": {"value": ["該当"] if "尾枕がある" in negs else []},
+          "皮膚の伸びが悪い": {"value": ["該当"] if "皮膚の伸びが悪い" in negs else []},
+          "背中が曲がっている": {"value": ["該当"] if "背中が曲がっている" in negs else []},
           "落札上限価格": {"value": calc["ボーダー価格"]},
           "実際落札額": {"value": price},
           "購入結果": {"value": status},
+          "設定枝肉単価": {"value": settings["carcass_price"]},
+          "設定育成コスト": {"value": settings["daily_cost"]},
+          "設定出荷日齢": {"value": settings["shipment_days"]},
+          "設定生時体重": {"value": settings["birth_weight"]},
+          "設定歩留基準_去勢": {"value": settings["yield_rate_mc"]},
+          "設定歩留基準_雌": {"value": settings["yield_rate_f"]},
+          "設定目標利益": {"value": settings["target_profit"]},
       })
   if not records:
     return False, "送信対象のデータがありません。"
@@ -802,6 +836,7 @@ if "cows" not in st.session_state:
     except Exception:
       st.session_state.cows = [{
           "No": i,
+          "個体識別番号": "",
           "体重": 0,
           "実際落札額": 0,
           "性別": "去",
@@ -819,6 +854,7 @@ if "cows" not in st.session_state:
   else:
     st.session_state.cows = [{
         "No": i,
+        "個体識別番号": "",
         "体重": 0,
         "実際落札額": 0,
         "性別": "去",
@@ -1251,11 +1287,11 @@ def render_results_tab():
     st.markdown("#### 🏆 本日落札した牛一覧")
     if my_cows:
         df_my = pd.DataFrame(my_cows)[[
-            "No", "性別", "生年月日", "日齢", "産次", "体重",
+            "No", "個体識別番号", "性別", "生年月日", "日齢", "産次", "体重",
             "父", "母の父", "母の祖父", "母の母の祖父", "摘要", "実際落札額"
         ]]
         df_my.columns = [
-            "出場番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
+            "出場番号", "個体識別番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
             "父牛", "母の父", "母の祖父", "母の母の祖父", "摘要", "落札額(千円)"
         ]
         st.dataframe(df_my, use_container_width=True, hide_index=True)
@@ -1271,6 +1307,7 @@ def render_results_tab():
         m = calculate_cow_metrics(c)
         all_rows.append({
             "出場番号": c["No"],
+            "個体識別番号": c.get("個体識別番号", "") or "-",
             "性別": c["性別"],
             "生年月日": c.get("生年月日", "-"),
             "日齢": c["日齢"],
