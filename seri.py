@@ -931,7 +931,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # =========================================================
-# 画面1: 事前データ自動読み取り画面
+# 画面1: 事前データ自動読み取り画面 ＋ 手動追加機能
 # =========================================================
 with tab1:
   st.subheader("📄 セリ名簿の自動読み取り")
@@ -970,6 +970,58 @@ with tab1:
           st.rerun()
       except Exception as e:
         st.error(f"❌ AIの読み取り中にサーバーエラーが発生しました。しばらく待ってから再度お試しください。\n\n詳細: {e}")
+
+  st.divider()
+
+  # --- ➕ 急遽追加された牛を手動で登録するフォーム ---
+  st.subheader("➕ 牛の手動追加（追加・修正用）")
+  st.markdown("名簿にない牛が急遽追加された場合や、情報を手動で追加したい場合に登録できます。")
+
+  with st.form("manual_add_cow_form"):
+    add_no = st.number_input("出場番号 (No)", min_value=1, step=1, value=int(max([c["No"] for c in st.session_state.cows], default=0) + 1))
+    add_gender = st.selectbox("性別", ["去", "雌"])
+    add_days = st.number_input("日齢", min_value=1, step=1, value=280)
+    add_weight = st.number_input("当日体重 (kg)", min_value=0.0, step=1.0, value=0.0)
+    add_father = st.text_input("父牛", value="")
+    add_memo = st.text_input("摘要（メモなど）", value="")
+
+    submitted = st.form_submit_button("➕ この牛を追加する", use_container_width=True)
+    if submitted:
+      # すでに同じNoの牛がいないか確認、あれば上書き、なければ追加
+      existing_cow = next((c for c in st.session_state.cows if c["No"] == add_no), None)
+      if existing_cow:
+        existing_cow["性別"] = add_gender
+        existing_cow["日齢"] = int(add_days)
+        existing_cow["体重"] = float(add_weight)
+        existing_cow["父"] = add_father
+        existing_cow["摘要"] = add_memo
+        st.toast(f"No.{add_no} の情報を更新しました！", icon="✅")
+      else:
+        new_cow = {
+            "No": int(add_no),
+            "個体識別番号": "",
+            "体重": float(add_weight),
+            "実際落札額": 0,
+            "性別": add_gender,
+            "生年月日": "-",
+            "日齢": int(add_days),
+            "産次": 1,
+            "父": add_father if add_father else "-",
+            "母の父": "-",
+            "母の祖父": "-",
+            "母の母の祖父": "-",
+            "摘要": add_memo,
+            "自社落札": False,
+            "マイナス要素": [],
+        }
+        st.session_state.cows.append(new_cow)
+        # 出場番号順（No順）にリストを綺麗にソート
+        st.session_state.cows = sorted(st.session_state.cows, key=lambda x: x["No"])
+        st.toast(f"No.{add_no} を新しく追加しました！", icon="🎉")
+      
+      st.session_state.metrics_dirty = True
+      save_backup()
+      st.rerun()
 
 
 # =========================================================
@@ -1127,9 +1179,7 @@ with tab3:
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
   avg_unit_price = calculate_average_unit_price()
-
   calc = calculate_cow_metrics(cow)
 
   display_p = (
@@ -1297,7 +1347,7 @@ with tab3:
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面（正しい番号順 ＆ Y軸1000〜3500固定）
+# 画面4: kg単価推移グラフ画面
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1308,7 +1358,6 @@ with tab4:
   for c in st.session_state.cows:
     p = c.get("実際落札額", 0)
     w = c.get("体重", 0)
-    # 0円や未入力の牛はグラフからも自動除外
     if p and p > 0 and w and w > 0:
       kp = int(round(p * 1000 / w))
       graph_data.append({
