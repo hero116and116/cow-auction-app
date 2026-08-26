@@ -987,6 +987,242 @@ with tab1:
 
 
 # =========================================================
+# JavaScriptネイティブ・テンキー描画ヘルパー
+# =========================================================
+def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit: str):
+    """
+    数字入力・CE・Cをブラウザ内JSで0秒即時反映し、
+    決定・←・→が押された時のみ親画面へ値を渡してPythonをトリガーする。
+    """
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        * {{
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
+        }}
+        body {{
+          background-color: transparent;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }}
+        .input-display-row {{
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          gap: 8px;
+          margin: 10px 0 16px 0;
+        }}
+        .input-display {{
+          font-size: 32px;
+          font-weight: 800;
+          color: #1e293b;
+          border-bottom: 2px solid #1e293b;
+          display: inline-block;
+          min-width: 160px;
+          height: 40px;
+          line-height: 40px;
+          padding: 2px 6px;
+          text-align: right;
+          white-space: nowrap;
+          overflow: hidden;
+        }}
+        .input-unit {{
+          font-size: 18px;
+          font-weight: 700;
+          color: #1e293b;
+        }}
+        .numpad-container {{
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          gap: 6px;
+          width: 100%;
+        }}
+        .col-left {{
+          flex: 0.8;
+          display: flex;
+        }}
+        .col-center {{
+          flex: 4.6;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }}
+        .col-right {{
+          flex: 0.8;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }}
+        .num-row {{
+          display: flex;
+          gap: 6px;
+          width: 100%;
+        }}
+        button {{
+          width: 100%;
+          border: 1px solid #94a3b8;
+          border-radius: 4px;
+          background-color: #ffffff;
+          color: #1e293b;
+          font-size: 28px;
+          font-weight: 700;
+          cursor: pointer;
+          padding: 0;
+          outline: none;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }}
+        button:active {{
+          border-color: #3b82f6;
+          color: #3b82f6;
+          background-color: #f8fafc;
+        }}
+        .btn-num {{
+          height: 72px;
+          flex: 1;
+        }}
+        .btn-prev {{
+          height: 306px;
+          font-size: 22px;
+        }}
+        .btn-ce {{
+          height: 72px;
+          font-size: 16px;
+          background-color: #fff7ed;
+          color: #c2410c;
+        }}
+        .btn-next {{
+          height: 228px;
+          font-size: 22px;
+        }}
+        .btn-c {{
+          background-color: #f1f5f9;
+          color: #dc2626;
+        }}
+        .btn-enter {{
+          background-color: #3b82f6;
+          color: #ffffff;
+          border-color: #3b82f6;
+        }}
+        .btn-enter:active {{
+          background-color: #2563eb;
+          color: #ffffff;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="input-display-row">
+        <span class="input-display" id="display-val">{initial_value}</span>
+        <span class="input-unit">{unit}</span>
+      </div>
+
+      <div class="numpad-container">
+        <div class="col-left">
+          <button class="btn-prev" onclick="sendAction('prev')">←</button>
+        </div>
+        <div class="col-center">
+          <div class="num-row">
+            <button class="btn-num" onclick="appendNum('7')">7</button>
+            <button class="btn-num" onclick="appendNum('8')">8</button>
+            <button class="btn-num" onclick="appendNum('9')">9</button>
+          </div>
+          <div class="num-row">
+            <button class="btn-num" onclick="appendNum('4')">4</button>
+            <button class="btn-num" onclick="appendNum('5')">5</button>
+            <button class="btn-num" onclick="appendNum('6')">6</button>
+          </div>
+          <div class="num-row">
+            <button class="btn-num" onclick="appendNum('1')">1</button>
+            <button class="btn-num" onclick="appendNum('2')">2</button>
+            <button class="btn-num" onclick="appendNum('3')">3</button>
+          </div>
+          <div class="num-row">
+            <button class="btn-num btn-c" onclick="clearVal()">C</button>
+            <button class="btn-num" onclick="appendNum('0')">0</button>
+            <button class="btn-num btn-enter" onclick="sendAction('enter')">決定</button>
+          </div>
+        </div>
+        <div class="col-right">
+          <button class="btn-ce" onclick="backspaceVal()">CE</button>
+          <button class="btn-next" onclick="sendAction('next')">→</button>
+        </div>
+      </div>
+
+      <script>
+        let currentVal = "{initial_value}";
+        const display = document.getElementById("display-val");
+
+        function updateDisplay() {{
+          display.innerText = currentVal;
+        }}
+
+        function appendNum(n) {{
+          if (currentVal === "0") currentVal = "";
+          currentVal += n;
+          updateDisplay();
+        }}
+
+        function backspaceVal() {{
+          currentVal = currentVal.slice(0, -1);
+          updateDisplay();
+        }}
+
+        function clearVal() {{
+          currentVal = "";
+          updateDisplay();
+          sendAction('clear');
+        }}
+
+        function sendAction(actionType) {{
+          const payload = {{
+            action: actionType,
+            val: currentVal,
+            target: "{target_mode}",
+            cow_id: {cow_id},
+            ts: Date.now()
+          }};
+          window.parent.postMessage({{ type: "SERI_NUMPAD_ACTION", payload: payload }}, "*");
+        }}
+      </script>
+    </body>
+    </html>
+    """
+    st_html(html_code, height=385)
+
+
+# --- 親画面側の postMessage 受信・セッション反映スクリプト ---
+_NUMPAD_LISTENER_HTML = r"""
+<script>
+(function() {
+  if (!window.parent.__seriNumpadListenerAttached) {
+    window.parent.__seriNumpadListenerAttached = true;
+    window.addEventListener("message", function(event) {
+      if (event.data && event.data.type === "SERI_NUMPAD_ACTION") {
+        const payload = event.data.payload;
+        const hiddenInput = window.parent.document.getElementById("seri_numpad_bridge");
+        if (hiddenInput) {
+          hiddenInput.value = JSON.stringify(payload);
+          hiddenInput.dispatchEvent(new Event("input", { bubbles: true }));
+          hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+    });
+  }
+})();
+</script>
+"""
+st_html(_NUMPAD_LISTENER_HTML, height=0, width=0)
+
+
+# =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
 def render_weight_tab():
@@ -1017,33 +1253,18 @@ def render_weight_tab():
             None,
         )
         if target_idx is not None:
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
           st.session_state.curr_idx_w = target_idx
-          st.session_state.input_buffer_w = ""
           st.rerun(scope="fragment")
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
-  display_w = (
-      st.session_state.input_buffer_w
-      if st.session_state.input_buffer_w != ""
-      else (str(cow["体重"]) if cow["体重"] > 0 else "")
-  )
-
+  # 上部カード（ピクトグラム・属性情報）
   card_html_w = (
-      '<div class="screen-card">'
+      '<div class="screen-card" style="margin-bottom: 0px; border-bottom:'
+      ' none; border-radius: 4px 4px 0 0;">'
       '<div class="card-top">'
       f'{get_cow_svg(cow["No"])}'
-      '<div class="input-display-row">'
-      f'<span class="input-display">{display_w}</span>'
-      '<span class="input-unit">kg</span>'
-      "</div>"
-      '<div class="cow-meta">'
+      '<div class="cow-meta" style="margin-top: 4px;">'
       f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父:'
       f' <b>{cow["父"]}</b>'
       "</div>"
@@ -1071,66 +1292,10 @@ def render_weight_tab():
       st.session_state.cows[idx]["マイナス要素"] = new_negs
       save_backup()
 
+  # ネイティブ高速テンキー（枠線下部を結合）
   with st.container(key="numpad_area_w"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
-
-    with col_l:
-      if st.button("←", key="prev_w", use_container_width=True):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = max(0, idx - 1)
-        st.session_state.input_buffer_w = ""
-        st.rerun(scope="fragment")
-
-    with col_r:
-      with st.container(key="numpad_right_w"):
-        if st.button("CE", key="ce_w", use_container_width=True):
-          st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun(scope="fragment")
-
-        if st.button("→", key="next_w", use_container_width=True):
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
-          st.session_state.curr_idx_w = min(total - 1, idx + 1)
-          st.session_state.input_buffer_w = ""
-          st.rerun(scope="fragment")
-
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
-            st.session_state.input_buffer_w += num
-            st.rerun(scope="fragment")
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
-        st.session_state.input_buffer_w = ""
-        st.session_state.cows[idx]["体重"] = 0
-        st.session_state.metrics_dirty = True
-        save_backup()
-        st.rerun(scope="fragment")
-      if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
-        st.session_state.input_buffer_w += "0"
-        st.rerun(scope="fragment")
-      if cols_bottom[2].button(
-          "決定", key="btn_w_enter", use_container_width=True
-      ):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.input_buffer_w = ""
-        st.rerun(scope="fragment")
+    init_val = str(cow["体重"]) if cow["体重"] > 0 else ""
+    render_native_numpad("weight", idx, init_val, "kg")
 
 
 # =========================================================
@@ -1141,20 +1306,12 @@ def render_price_tab():
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  # 【変更】数字入力中（input_buffer_p が空でない時）は全頭平均利益の再計算をスキップ
-  is_typing = st.session_state.input_buffer_p != ""
-  if st.session_state.metrics_dirty and not is_typing:
+  if st.session_state.metrics_dirty:
     st.session_state.avg_profit_cache = calculate_today_avg_profit()
     st.session_state.metrics_dirty = False
   avg_profit = st.session_state.avg_profit_cache
 
   calc = calculate_cow_metrics(cow)
-
-  display_p = (
-      st.session_state.input_buffer_p
-      if st.session_state.input_buffer_p != ""
-      else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
-  )
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1184,14 +1341,7 @@ def render_price_tab():
             None,
         )
         if target_idx is not None:
-          if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
           st.session_state.curr_idx_p = target_idx
-          st.session_state.input_buffer_p = ""
           st.rerun(scope="fragment")
         else:
           st.warning("その出場番号は見つかりませんでした。")
@@ -1212,7 +1362,8 @@ def render_price_tab():
   unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
   card_html_p = (
-      '<div class="screen-card">'
+      '<div class="screen-card" style="margin-bottom: 0px; border-bottom:'
+      ' none; border-radius: 4px 4px 0 0;">'
       '<div class="card-top">'
       '<div class="cow-top-row">'
       '<div class="cow-info-col cow-meta">'
@@ -1231,10 +1382,6 @@ def render_price_tab():
       f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
-      '<div class="input-display-row">'
-      f'<span class="input-display">{display_p}</span>'
-      '<span class="input-unit">千円</span>'
-      "</div>"
       "</div>"
       '<div class="card-divider"></div>'
       "</div>"
@@ -1252,66 +1399,72 @@ def render_price_tab():
       st.session_state.metrics_dirty = True
       save_backup()
 
+  # ネイティブ高速テンキー
   with st.container(key="numpad_area_p"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
+    init_val = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
+    render_native_numpad("price", idx, init_val, "千円")
 
-    with col_l:
-      if st.button("←", key="prev_p", use_container_width=True):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_p = max(0, idx - 1)
-        st.session_state.input_buffer_p = ""
-        st.rerun(scope="fragment")
 
-    with col_r:
-      with st.container(key="numpad_right_p"):
-        if st.button("CE", key="ce_p", use_container_width=True):
-          st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun(scope="fragment")
+# --- テンキーの決定・遷移イベントを受け取るブリッジ処理 ---
+bridge_val = st.text_input("numpad_bridge", key="seri_numpad_bridge", label_visibility="collapsed")
+if bridge_val:
+  try:
+    ev = json.loads(bridge_val)
+    action = ev.get("action")
+    val_str = ev.get("val", "")
+    target = ev.get("target")
+    cow_id = ev.get("cow_id")
+    total = len(st.session_state.cows)
 
-        if st.button("→", key="next_p", use_container_width=True):
-          if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
-          st.session_state.curr_idx_p = min(total - 1, idx + 1)
-          st.session_state.input_buffer_p = ""
-          st.rerun(scope="fragment")
-
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
-            st.session_state.input_buffer_p += num
-            st.rerun(scope="fragment")
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
-        st.session_state.input_buffer_p = ""
-        st.session_state.cows[idx]["実際落札額"] = 0
+    if target == "weight":
+      parsed_val = float(val_str) if val_str else 0.0
+      if action == "clear":
+        st.session_state.cows[cow_id]["体重"] = 0.0
         st.session_state.metrics_dirty = True
         save_backup()
-        st.rerun(scope="fragment")
-      if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
-        st.session_state.input_buffer_p += "0"
-        st.rerun(scope="fragment")
-      if cols_bottom[2].button(
-          "決定", key="btn_p_enter", use_container_width=True
-      ):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
+      elif action == "enter":
+        st.session_state.cows[cow_id]["体重"] = parsed_val
+        st.session_state.metrics_dirty = True
+        save_backup()
+      elif action == "prev":
+        if val_str:
+          st.session_state.cows[cow_id]["体重"] = parsed_val
           st.session_state.metrics_dirty = True
           save_backup()
-        st.session_state.input_buffer_p = ""
-        st.rerun(scope="fragment")
+        st.session_state.curr_idx_w = max(0, cow_id - 1)
+      elif action == "next":
+        if val_str:
+          st.session_state.cows[cow_id]["体重"] = parsed_val
+          st.session_state.metrics_dirty = True
+          save_backup()
+        st.session_state.curr_idx_w = min(total - 1, cow_id + 1)
+
+    elif target == "price":
+      parsed_val = int(val_str) if val_str else 0
+      if action == "clear":
+        st.session_state.cows[cow_id]["実際落札額"] = 0
+        st.session_state.metrics_dirty = True
+        save_backup()
+      elif action == "enter":
+        st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+        st.session_state.metrics_dirty = True
+        save_backup()
+      elif action == "prev":
+        if val_str:
+          st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+          st.session_state.metrics_dirty = True
+          save_backup()
+        st.session_state.curr_idx_p = max(0, cow_id - 1)
+      elif action == "next":
+        if val_str:
+          st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+          st.session_state.metrics_dirty = True
+          save_backup()
+        st.session_state.curr_idx_p = min(total - 1, cow_id + 1)
+
+    st.rerun(scope="fragment")
+  except Exception:
+    pass
 
 
 @st.fragment
