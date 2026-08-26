@@ -149,6 +149,75 @@ _DISCONNECT_WATCHER_HTML = r"""
 """
 st_html(_DISCONNECT_WATCHER_HTML, height=0, width=0)
 
+# --- JS即時反映テンキー（案B）用のグローバル関数・状態 ---
+# 体重・落札額の数字入力（0-9・CE）はサーバーへ一切送らず、ここで
+# window.parent 上に定義する関数だけで画面表示を書き換える。
+# 「決定」「←」「→」「C」など実際に値を確定する操作のときだけ、
+# 隠しテキスト入力（.st-key-hidden_commit_wrap_w / _p）に確定値を
+# 書き込んでからStreamlitの本物のボタンクリックを発生させ、
+# そこで初めてサーバー側の再計算・保存が走る。
+_NUMPAD_JS = r"""
+<script>
+(function() {
+  const win = window.parent;
+  const doc = win.document;
+
+  // ページ全体で1回だけ初期化する（フラグメントの再実行では
+  // 上書きしない。途中まで打ち込んだ数字が消えないようにするため）
+  if (typeof win.seriState === 'undefined') {
+    win.seriState = { w: '', p: '' };
+    win.seriGen = { w: -1, p: -1 };
+  }
+
+  win.seriUpdateDisplay = function(screen) {
+    const span = doc.getElementById('seri-disp-' + screen);
+    if (span) {
+      span.textContent = win.seriState[screen] || '';
+    }
+  };
+
+  win.seriDigit = function(screen, d) {
+    win.seriState[screen] = (win.seriState[screen] || '') + d;
+    win.seriUpdateDisplay(screen);
+  };
+
+  win.seriBackspace = function(screen) {
+    const cur = win.seriState[screen] || '';
+    win.seriState[screen] = cur.slice(0, -1);
+    win.seriUpdateDisplay(screen);
+  };
+
+  function syncHiddenInput(screen) {
+    const wrap = doc.querySelector('.st-key-hidden_commit_wrap_' + screen);
+    if (!wrap) return;
+    const input = wrap.querySelector('input');
+    if (!input) return;
+    const value = win.seriState[screen] || '';
+    if (input.value === value) return;
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+        win.HTMLInputElement.prototype, 'value'
+    ).set;
+    nativeSetter.call(input, value);
+    input.dispatchEvent(new win.Event('input', { bubbles: true }));
+  }
+
+  // 「決定」「←」「→」「C」など、本物のStreamlitボタンが押される
+  // 直前（キャプチャフェーズ）に、隠しテキスト入力へ最新の入力中
+  // 文字列を同期させる。どのボタンかを厳密に判定せず、クリック
+  // されるたびに両画面分を毎回同期させることで、セレクタのズレに
+  // よる取りこぼしを防ぐ（同期処理自体は軽量なのでコストは無視できる）。
+  if (!win.__seriCommitSyncAttached) {
+    win.__seriCommitSyncAttached = true;
+    doc.addEventListener('click', function() {
+      syncHiddenInput('w');
+      syncHiddenInput('p');
+    }, true);
+  }
+})();
+</script>
+"""
+st_html(_NUMPAD_JS, height=0, width=0)
+
 # --- マイナス要素の項目一覧 ---
 NEGATIVE_FACTORS = [
     "馬面",
@@ -550,6 +619,53 @@ st.markdown(
         transform: none !important;
         width: 21rem !important;
     }
+
+    /* --- JS即時反映テンキー（案B）---
+       数字ボタンとCEはサーバー往復を発生させないプレーンなHTML
+       ボタンに置き換えている。見た目は元のst.button版
+       （.st-key-numpad_area_w button 等）に揃える。 */
+    .seri-digit-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+    .seri-digit-btn {
+        flex: 1;
+        height: 72px;
+        font-size: 28px;
+        font-weight: 700;
+        border-radius: 4px;
+        border: 1px solid #94a3b8;
+        background-color: #ffffff;
+        color: #1e293b;
+        padding: 0;
+        cursor: pointer;
+    }
+    .seri-digit-btn:hover {
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+    .seri-digit-btn:active {
+        background-color: #eff6ff;
+    }
+    .seri-btn-ce {
+        background-color: #fff7ed !important;
+        color: #c2410c !important;
+        font-size: 16px !important;
+    }
+    /* サーバーへ確定値を渡すための隠しテキスト入力。非表示だが
+       display:none にはしない（JSからのvalue書き換え＋input
+       イベント発火を安定させるため）。 */
+    .seri-hidden-commit,
+    .st-key-hidden_commit_wrap_w,
+    .st-key-hidden_commit_wrap_p {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -927,6 +1043,15 @@ if "reset_ver" not in st.session_state:
   # チェックボックス等のウィジェットキーに混ぜて、初期化のたびに
   # 「別物のウィジェット」として確実に作り直させるための世代カウンタ
   st.session_state.reset_ver = 0
+if "buf_gen_w" not in st.session_state:
+  # JS側の入力中バッファ（window.parent.seriState.w）を「確定・移動
+  # 済みだからリセットしてよい」とJSに伝えるための世代カウンタ。
+  # 「決定」「←」「→」「C」など確定操作のたびに1つ増やす。
+  # マイナス要素ピルの切り替えなど、確定を伴わない再実行では
+  # 増やさないことで、入力途中の数字が消えないようにしている。
+  st.session_state.buf_gen_w = 0
+if "buf_gen_p" not in st.session_state:
+  st.session_state.buf_gen_p = 0
 
 
 
@@ -937,6 +1062,72 @@ def get_cow_svg(number_str):
 <div class="cow-number-overlay">{number_str}</div>
 </div>"""
   return html
+
+
+# --- JS即時反映テンキー用ヘルパー ---
+def numpad_digit_rows_html(screen):
+  """0-9のうち7,8,9/4,5,6/1,2,3の3行分を、サーバー往復なしの
+  プレーンなHTMLボタンとして生成する（screen: 'w' または 'p'）"""
+  rows_html = ""
+  for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
+    buttons = "".join(
+        f'<button type="button" class="seri-digit-btn" '
+        f"onclick=\"window.seriDigit('{screen}','{n}')\">{n}</button>"
+        for n in row_nums
+    )
+    rows_html += f'<div class="seri-digit-row">{buttons}</div>'
+  return rows_html
+
+
+def js_zero_button_html(screen):
+  """下段の「0」ボタン（サーバー往復なし）"""
+  return (
+      '<button type="button" class="seri-digit-btn" '
+      f"onclick=\"window.seriDigit('{screen}','0')\">0</button>"
+  )
+
+
+def js_backspace_button_html(screen):
+  """CEボタン（サーバー往復なし、1文字削除）"""
+  return (
+      '<button type="button" class="seri-digit-btn seri-btn-ce" '
+      f"onclick=\"window.seriBackspace('{screen}')\">CE</button>"
+  )
+
+
+def render_reset_check_script(screen, current_gen):
+  """このタブが再実行されるたびに呼ぶ。current_genが前回見た値と
+  異なる場合（＝確定・移動・全初期化などがあった場合）だけ、
+  JS側の入力中バッファを空にリセットする。ピル切り替えなど
+  確定を伴わない再実行ではgenが変わらないため、入力途中の
+  文字列は保持される。"""
+  script = f"""
+<script>
+(function() {{
+  const win = window.parent;
+  const screen = '{screen}';
+  const currentGen = {current_gen};
+  if (typeof win.seriGen === 'undefined') {{
+    win.seriGen = {{ w: -1, p: -1 }};
+    win.seriState = {{ w: '', p: '' }};
+  }}
+  if (win.seriGen[screen] !== currentGen) {{
+    // 確定・移動・全初期化があった。JS側の入力中バッファを破棄する。
+    // このときPython側が確定値を正しく描画済みなので、表示側は
+    // 触らない。
+    win.seriGen[screen] = currentGen;
+    win.seriState[screen] = '';
+  }} else if (win.seriState[screen] && win.seriUpdateDisplay) {{
+    // 確定を伴わない再実行（マイナス要素ピル切替など）。
+    // Python側の再描画で表示が「確定済みの値」に巻き戻って
+    // しまうため、JS側が覚えている入力途中の文字列で表示を
+    // 上書きし直す。
+    win.seriUpdateDisplay(screen);
+  }}
+}})();
+</script>
+"""
+  st_html(script, height=0, width=0)
 
 
 # --- メインタブ ---
@@ -980,6 +1171,8 @@ with tab1:
         st.session_state.curr_idx_p = 0
         st.session_state.input_buffer_w = ""
         st.session_state.input_buffer_p = ""
+        st.session_state.buf_gen_w += 1
+        st.session_state.buf_gen_p += 1
         st.session_state.just_parsed_count = len(parsed)
         save_backup()
         st.toast("読み取りが完了しました！", icon="✅")
@@ -993,6 +1186,13 @@ def render_weight_tab():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
+
+  # このタブが再実行されるたびに呼ぶ。確定・移動があった場合だけ
+  # JS側の入力中バッファをリセットする（案B）
+  render_reset_check_script("w", st.session_state.buf_gen_w)
+
+  def _current_input_w():
+    return st.session_state.get(f"hidden_commit_w_{st.session_state.buf_gen_w}", "")
 
   with st.container(key="no_jump_w"):
     with st.popover(f"No.{cow['No']} ✎"):
@@ -1017,30 +1217,25 @@ def render_weight_tab():
             None,
         )
         if target_idx is not None:
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
+          buf_val = _current_input_w()
+          if buf_val:
+            st.session_state.cows[idx]["体重"] = float(buf_val)
             st.session_state.metrics_dirty = True
             save_backup()
           st.session_state.curr_idx_w = target_idx
-          st.session_state.input_buffer_w = ""
+          st.session_state.buf_gen_w += 1
           st.rerun(scope="fragment")
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
-  display_w = (
-      st.session_state.input_buffer_w
-      if st.session_state.input_buffer_w != ""
-      else (str(cow["体重"]) if cow["体重"] > 0 else "")
-  )
+  display_w = str(cow["体重"]) if cow["体重"] > 0 else ""
 
   card_html_w = (
       '<div class="screen-card">'
       '<div class="card-top">'
       f'{get_cow_svg(cow["No"])}'
       '<div class="input-display-row">'
-      f'<span class="input-display">{display_w}</span>'
+      f'<span class="input-display" id="seri-disp-w">{display_w}</span>'
       '<span class="input-unit">kg</span>'
       "</div>"
       '<div class="cow-meta">'
@@ -1076,61 +1271,65 @@ def render_weight_tab():
 
     with col_l:
       if st.button("←", key="prev_w", use_container_width=True):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
+        buf_val = _current_input_w()
+        if buf_val:
+          st.session_state.cows[idx]["体重"] = float(buf_val)
           st.session_state.metrics_dirty = True
           save_backup()
         st.session_state.curr_idx_w = max(0, idx - 1)
-        st.session_state.input_buffer_w = ""
+        st.session_state.buf_gen_w += 1
         st.rerun(scope="fragment")
 
     with col_r:
       with st.container(key="numpad_right_w"):
-        if st.button("CE", key="ce_w", use_container_width=True):
-          st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun(scope="fragment")
+        # CE：サーバー往復なし（JS側でバッファの末尾1文字を削除）
+        st.markdown(js_backspace_button_html("w"), unsafe_allow_html=True)
 
         if st.button("→", key="next_w", use_container_width=True):
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
+          buf_val = _current_input_w()
+          if buf_val:
+            st.session_state.cows[idx]["体重"] = float(buf_val)
             st.session_state.metrics_dirty = True
             save_backup()
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
-          st.session_state.input_buffer_w = ""
+          st.session_state.buf_gen_w += 1
           st.rerun(scope="fragment")
 
     with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
-            st.session_state.input_buffer_w += num
-            st.rerun(scope="fragment")
+      # 数字7〜1（サーバー往復なし、JSが画面表示を直接更新）
+      st.markdown(numpad_digit_rows_html("w"), unsafe_allow_html=True)
+
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
-        st.session_state.input_buffer_w = ""
         st.session_state.cows[idx]["体重"] = 0
         st.session_state.metrics_dirty = True
         save_backup()
+        st.session_state.buf_gen_w += 1
         st.rerun(scope="fragment")
-      if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
-        st.session_state.input_buffer_w += "0"
-        st.rerun(scope="fragment")
+      with cols_bottom[1]:
+        # 0：サーバー往復なし
+        st.markdown(js_zero_button_html("w"), unsafe_allow_html=True)
       if cols_bottom[2].button(
           "決定", key="btn_w_enter", use_container_width=True
       ):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
+        buf_val = _current_input_w()
+        if buf_val:
+          st.session_state.cows[idx]["体重"] = float(buf_val)
           st.session_state.metrics_dirty = True
           save_backup()
-        st.session_state.input_buffer_w = ""
+        st.session_state.buf_gen_w += 1
         st.rerun(scope="fragment")
+
+  # 確定値をサーバーへ渡すための隠しテキスト入力（非表示）。
+  # widgetキーにbuf_gen_wを含めることで、確定のたびに新しい
+  # （空の）ウィジェットとして作り直され、自動的にクリアされる。
+  with st.container(key="hidden_commit_wrap_w"):
+    st.text_input(
+        "hidden_commit_w",
+        value="",
+        key=f"hidden_commit_w_{st.session_state.buf_gen_w}",
+        label_visibility="collapsed",
+    )
 
 
 # =========================================================
@@ -1146,11 +1345,14 @@ def render_price_tab():
     st.session_state.metrics_dirty = False
   avg_profit = st.session_state.avg_profit_cache
 
-  display_p = (
-      st.session_state.input_buffer_p
-      if st.session_state.input_buffer_p != ""
-      else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
-  )
+  # このタブが再実行されるたびに呼ぶ。確定・移動があった場合だけ
+  # JS側の入力中バッファをリセットする（案B）
+  render_reset_check_script("p", st.session_state.buf_gen_p)
+
+  def _current_input_p():
+    return st.session_state.get(f"hidden_commit_p_{st.session_state.buf_gen_p}", "")
+
+  display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1180,14 +1382,13 @@ def render_price_tab():
             None,
         )
         if target_idx is not None:
-          if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
+          buf_val = _current_input_p()
+          if buf_val:
+            st.session_state.cows[idx]["実際落札額"] = int(buf_val)
             st.session_state.metrics_dirty = True
             save_backup()
           st.session_state.curr_idx_p = target_idx
-          st.session_state.input_buffer_p = ""
+          st.session_state.buf_gen_p += 1
           st.rerun(scope="fragment")
         else:
           st.warning("その出場番号は見つかりませんでした。")
@@ -1228,7 +1429,7 @@ def render_price_tab():
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
       '<div class="input-display-row">'
-      f'<span class="input-display">{display_p}</span>'
+      f'<span class="input-display" id="seri-disp-p">{display_p}</span>'
       '<span class="input-unit">千円</span>'
       "</div>"
       "</div>"
@@ -1253,61 +1454,63 @@ def render_price_tab():
 
     with col_l:
       if st.button("←", key="prev_p", use_container_width=True):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
+        buf_val = _current_input_p()
+        if buf_val:
+          st.session_state.cows[idx]["実際落札額"] = int(buf_val)
           st.session_state.metrics_dirty = True
           save_backup()
         st.session_state.curr_idx_p = max(0, idx - 1)
-        st.session_state.input_buffer_p = ""
+        st.session_state.buf_gen_p += 1
         st.rerun(scope="fragment")
 
     with col_r:
       with st.container(key="numpad_right_p"):
-        if st.button("CE", key="ce_p", use_container_width=True):
-          st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun(scope="fragment")
+        # CE：サーバー往復なし（JS側でバッファの末尾1文字を削除）
+        st.markdown(js_backspace_button_html("p"), unsafe_allow_html=True)
 
         if st.button("→", key="next_p", use_container_width=True):
-          if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
+          buf_val = _current_input_p()
+          if buf_val:
+            st.session_state.cows[idx]["実際落札額"] = int(buf_val)
             st.session_state.metrics_dirty = True
             save_backup()
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
-          st.session_state.input_buffer_p = ""
+          st.session_state.buf_gen_p += 1
           st.rerun(scope="fragment")
 
     with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
-            st.session_state.input_buffer_p += num
-            st.rerun(scope="fragment")
+      # 数字7〜1（サーバー往復なし、JSが画面表示を直接更新）
+      st.markdown(numpad_digit_rows_html("p"), unsafe_allow_html=True)
+
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
-        st.session_state.input_buffer_p = ""
         st.session_state.cows[idx]["実際落札額"] = 0
         st.session_state.metrics_dirty = True
         save_backup()
+        st.session_state.buf_gen_p += 1
         st.rerun(scope="fragment")
-      if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
-        st.session_state.input_buffer_p += "0"
-        st.rerun(scope="fragment")
+      with cols_bottom[1]:
+        # 0：サーバー往復なし
+        st.markdown(js_zero_button_html("p"), unsafe_allow_html=True)
       if cols_bottom[2].button(
           "決定", key="btn_p_enter", use_container_width=True
       ):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
+        buf_val = _current_input_p()
+        if buf_val:
+          st.session_state.cows[idx]["実際落札額"] = int(buf_val)
           st.session_state.metrics_dirty = True
           save_backup()
-        st.session_state.input_buffer_p = ""
+        st.session_state.buf_gen_p += 1
         st.rerun(scope="fragment")
+
+  # 確定値をサーバーへ渡すための隠しテキスト入力（非表示）。
+  with st.container(key="hidden_commit_wrap_p"):
+    st.text_input(
+        "hidden_commit_p",
+        value="",
+        key=f"hidden_commit_p_{st.session_state.buf_gen_p}",
+        label_visibility="collapsed",
+    )
 
 
 @st.fragment
@@ -1409,6 +1612,8 @@ def render_results_tab():
             st.session_state.curr_idx_p = 0
             st.session_state.input_buffer_w = ""
             st.session_state.input_buffer_p = ""
+            st.session_state.buf_gen_w = st.session_state.get("buf_gen_w", 0) + 1
+            st.session_state.buf_gen_p = st.session_state.get("buf_gen_p", 0) + 1
             st.session_state.metrics_dirty = True
             st.session_state.kintone_sent_success = False
             st.rerun()
