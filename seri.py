@@ -731,13 +731,12 @@ def calculate_cow_metrics(cow_row):
   }
 
 
-# --- kg単価の平均を計算する関数（累計変数による高速化） ---
+# --- kg単価の平均を計算する関数（累計変数による高速化 ＋ 0円除外） ---
 def calculate_average_unit_price():
   """
   落札額が確定している牛たちのkg単価の平均を算出する。
-  セッションステートに累計金額と件数をキャッシュし、毎回全頭ループする重い処理を防ぐ。
+  実際落札額が0以下の牛は自動で除外する。
   """
-  # キャッシュまたは計算値が未初期化、あるいはメトリクスが汚れている場合は再計算
   if "avg_unit_price_cache" not in st.session_state or st.session_state.get("metrics_dirty", True):
     total_sum = 0
     count = 0
@@ -745,7 +744,6 @@ def calculate_average_unit_price():
       price = c.get("実際落札額", 0)
       weight = c.get("体重", 0)
       if price and price > 0 and weight and weight > 0:
-        # 実際落札額は「千円」単位なので、円に戻す: price * 1000 / weight
         kp = int(round(price * 1000 / weight))
         total_sum += kp
         count += 1
@@ -971,7 +969,6 @@ with tab1:
           st.toast("読み取りが完了しました！", icon="✅")
           st.rerun()
       except Exception as e:
-        # サーバーエラーや通信エラーが発生してもアプリを落とさず、メッセージを表示
         st.error(f"❌ AIの読み取り中にサーバーエラーが発生しました。しばらく待ってから再度お試しください。\n\n詳細: {e}")
 
 
@@ -1130,7 +1127,7 @@ with tab3:
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  # kg単価の平均値を取得（累計変数を用いた高速計算）
+  # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
   avg_unit_price = calculate_average_unit_price()
 
   calc = calculate_cow_metrics(cow)
@@ -1300,7 +1297,7 @@ with tab3:
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面
+# 画面4: kg単価推移グラフ画面（正しい番号順 ＆ Y軸1000〜3500固定）
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1311,6 +1308,7 @@ with tab4:
   for c in st.session_state.cows:
     p = c.get("実際落札額", 0)
     w = c.get("体重", 0)
+    # 0円や未入力の牛はグラフからも自動除外
     if p and p > 0 and w and w > 0:
       kp = int(round(p * 1000 / w))
       graph_data.append({
@@ -1323,7 +1321,6 @@ with tab4:
   if graph_data:
     df_g = pd.DataFrame(graph_data).sort_values("raw_no")
     
-    # Altairを使用して、X軸を正しい番号順に強制し、Y軸を1,000〜3,500に固定する
     import altair as alt
     
     chart = alt.Chart(df_g).mark_line(point=True).encode(
