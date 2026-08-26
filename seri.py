@@ -952,23 +952,27 @@ with tab1:
       "🚀 自動読み取り開始", type="primary", use_container_width=True
   ):
     with st.spinner("AIが名簿を解析中..."):
-      parsed = parse_catalog_file(uploaded)
-      if parsed:
-        for r in parsed:
-          r["体重"] = 0
-          r["実際落札額"] = 0
-          r["自社落札"] = False
-          r["マイナス要素"] = []
-        st.session_state.cows = parsed
-        st.session_state.metrics_dirty = True
-        st.session_state.curr_idx_w = 0
-        st.session_state.curr_idx_p = 0
-        st.session_state.input_buffer_w = ""
-        st.session_state.input_buffer_p = ""
-        st.session_state.just_parsed_count = len(parsed)
-        save_backup()
-        st.toast("読み取りが完了しました！", icon="✅")
-        st.rerun()
+      try:
+        parsed = parse_catalog_file(uploaded)
+        if parsed:
+          for r in parsed:
+            r["体重"] = 0
+            r["実際落札額"] = 0
+            r["自社落札"] = False
+            r["マイナス要素"] = []
+          st.session_state.cows = parsed
+          st.session_state.metrics_dirty = True
+          st.session_state.curr_idx_w = 0
+          st.session_state.curr_idx_p = 0
+          st.session_state.input_buffer_w = ""
+          st.session_state.input_buffer_p = ""
+          st.session_state.just_parsed_count = len(parsed)
+          save_backup()
+          st.toast("読み取りが完了しました！", icon="✅")
+          st.rerun()
+      except Exception as e:
+        # サーバーエラーや通信エラーが発生してもアプリを落とさず、メッセージを表示
+        st.error(f"❌ AIの読み取り中にサーバーエラーが発生しました。しばらく待ってから再度お試しください。\n\n詳細: {e}")
 
 
 # =========================================================
@@ -1310,6 +1314,7 @@ with tab4:
     if p and p > 0 and w and w > 0:
       kp = int(round(p * 1000 / w))
       graph_data.append({
+          "No": int(c['No']),
           "出場番号": f"No.{c['No']}",
           "kg単価(円)": kp,
           "raw_no": c["No"]
@@ -1317,7 +1322,18 @@ with tab4:
 
   if graph_data:
     df_g = pd.DataFrame(graph_data).sort_values("raw_no")
-    st.line_chart(df_g.set_index("出場番号")["kg単価(円)"], use_container_width=True)
+    
+    # Altairを使用して、X軸を正しい番号順に強制し、Y軸を1,000〜3,500に固定する
+    import altair as alt
+    
+    chart = alt.Chart(df_g).mark_line(point=True).encode(
+        x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
+        y=alt.Y('kg単価(円):Q', scale=alt.Scale(domain=[1000, 3500]), title='kg単価 (円)')
+    ).properties(
+        height=300
+    )
+    
+    st.altair_chart(chart, use_container_width=True)
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
