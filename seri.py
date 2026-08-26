@@ -731,16 +731,30 @@ def calculate_cow_metrics(cow_row):
   }
 
 
-def calculate_today_avg_profit():
-  diffs = []
-  for c in st.session_state.cows:
-    price = c.get("実際落札額", 0)
-    if price and price > 0:
-      m = calculate_cow_metrics(c)
-      diffs.append(m["ボーダー価格"] - price)
-  if not diffs:
-    return 0
-  return int(round(sum(diffs) / len(diffs)))
+# --- kg単価の平均を計算する関数（累計変数による高速化） ---
+def calculate_average_unit_price():
+  """
+  落札額が確定している牛たちのkg単価の平均を算出する。
+  セッションステートに累計金額と件数をキャッシュし、毎回全頭ループする重い処理を防ぐ。
+  """
+  # キャッシュまたは計算値が未初期化、あるいはメトリクスが汚れている場合は再計算
+  if "avg_unit_price_cache" not in st.session_state or st.session_state.get("metrics_dirty", True):
+    total_sum = 0
+    count = 0
+    for c in st.session_state.cows:
+      price = c.get("実際落札額", 0)
+      weight = c.get("体重", 0)
+      if price and price > 0 and weight and weight > 0:
+        # 実際落札額は「千円」単位なので、円に戻す: price * 1000 / weight
+        kp = int(round(price * 1000 / weight))
+        total_sum += kp
+        count += 1
+    
+    st.session_state.total_unit_price_sum = total_sum
+    st.session_state.bid_count = count
+    st.session_state.avg_unit_price_cache = int(round(total_sum / count)) if count > 0 else 0
+  
+  return st.session_state.avg_unit_price_cache
 
 
 def clean_gender(val):
@@ -888,8 +902,12 @@ if "input_buffer_w" not in st.session_state:
   st.session_state.input_buffer_w = ""
 if "input_buffer_p" not in st.session_state:
   st.session_state.input_buffer_p = ""
-if "avg_profit_cache" not in st.session_state:
-  st.session_state.avg_profit_cache = 0
+if "avg_unit_price_cache" not in st.session_state:
+  st.session_state.avg_unit_price_cache = 0
+if "total_unit_price_sum" not in st.session_state:
+  st.session_state.total_unit_price_sum = 0
+if "bid_count" not in st.session_state:
+  st.session_state.bid_count = 0
 if "metrics_dirty" not in st.session_state:
   st.session_state.metrics_dirty = True
 if "reset_ver" not in st.session_state:
@@ -905,7 +923,7 @@ def get_cow_svg(number_str):
   return html
 
 
-# --- メインタブ（5タブ構成に変更） ---
+# --- メインタブ（5タブ構成） ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📷 事前データ自動読み取り",
     "⚖️ 体重入力（下見）",
@@ -1108,10 +1126,8 @@ with tab3:
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  if st.session_state.metrics_dirty:
-    st.session_state.avg_profit_cache = calculate_today_avg_profit()
-    st.session_state.metrics_dirty = False
-  avg_profit = st.session_state.avg_profit_cache
+  # kg単価の平均値を取得（累計変数を用いた高速計算）
+  avg_unit_price = calculate_average_unit_price()
 
   calc = calculate_cow_metrics(cow)
 
@@ -1192,7 +1208,7 @@ with tab3:
       f'<div class="cow-neg-col">{neg_badges_html}</div>'
       "</div>"
       '<div class="cow-metrics">'
-      f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
+      f'落札牛平均kg単価 <span class="profit">{avg_unit_price:,}</span>(円/kg)<br>'
       f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
@@ -1280,12 +1296,10 @@ with tab3:
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面（新設）
+# 画面4: kg単価推移グラフ画面
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
-  st.markdown("これまでの落札データのkg単価の推移を確認できます。")
-
   if st.button("🔄 グラフを更新", key="graph_manual_refresh", use_container_width=True):
     st.rerun()
 
@@ -1305,7 +1319,6 @@ with tab4:
     df_g = pd.DataFrame(graph_data).sort_values("raw_no")
     st.line_chart(df_g.set_index("出場番号")["kg単価(円)"], use_container_width=True)
     
-    # 簡易統計情報
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
     avg_kp = int(df_g["kg単価(円)"].mean())
