@@ -1310,15 +1310,25 @@ def render_price_tab():
         st.rerun(scope="fragment")
 
 
+# 体重入力タブと落札額入力タブは、以前は1つの @st.fragment にまとめて
+# いたため、どちらか一方でテンキーを押すたびに、表示されていない
+# もう一方のタブまで毎回再計算・再描画されてしまい、入力の反映が
+# 遅く感じられていた。それぞれ独立した @st.fragment に分離し、
+# 押した側のタブだけが再実行されるようにする。
 @st.fragment
-def render_weight_and_price_tabs():
+def render_weight_tab_fragment():
   with tab2:
     render_weight_tab()
+
+
+@st.fragment
+def render_price_tab_fragment():
   with tab3:
     render_price_tab()
 
 
-render_weight_and_price_tabs()
+render_weight_tab_fragment()
+render_price_tab_fragment()
 
 
 # =========================================================
