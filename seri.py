@@ -1140,11 +1140,15 @@ def render_price_tab():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
-  calc = calculate_cow_metrics(cow)
-  if st.session_state.metrics_dirty:
+
+  # 【変更】数字入力中（input_buffer_p が空でない時）は全頭平均利益の再計算をスキップ
+  is_typing = st.session_state.input_buffer_p != ""
+  if st.session_state.metrics_dirty and not is_typing:
     st.session_state.avg_profit_cache = calculate_today_avg_profit()
     st.session_state.metrics_dirty = False
   avg_profit = st.session_state.avg_profit_cache
+
+  calc = calculate_cow_metrics(cow)
 
   display_p = (
       st.session_state.input_buffer_p
