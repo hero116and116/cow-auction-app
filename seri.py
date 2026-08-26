@@ -82,6 +82,9 @@ st.set_page_config(
 )
 
 # --- 通信切断検知バナー ---
+# 画面を3分以上バックグラウンド（非表示）にしていた場合、次に画面へ
+# 戻ってきたタイミングで「通信が切れているかもしれません」というバナーを
+# 画面上部に表示し、ワンタップで再読み込みできるようにする。
 _DISCONNECT_WATCHER_HTML = r"""
 <script>
 (function() {
@@ -454,15 +457,20 @@ st.markdown(
         color: #dc2626 !important;
     }
 
-    .st-key-numpad_area_w div[data-testid="element-container"],
-    .st-key-numpad_area_p div[data-testid="element-container"] {
+    /* numpad_area_w 内の各「行」（要素コンテナ）の縦間隔を、横方向の
+       gap(6px)と揃えて明示的に統一する。各カラム内では最後の要素は
+       自動的に :last-child になるため、個々のボタン自体には影響しない。
+       これにより 数字4行 = 72px×4 + 6px×3 = 306px という総高さを
+       算数で正確に把握でき、右カラムのCE/→の高さもそれに合わせて
+       ズレなく計算できる。 */
+    .st-key-numpad_area_w div[data-testid="element-container"] {
         margin: 0 !important;
     }
-    .st-key-numpad_area_w div[data-testid="element-container"]:not(:last-child),
-    .st-key-numpad_area_p div[data-testid="element-container"]:not(:last-child) {
+    .st-key-numpad_area_w div[data-testid="element-container"]:not(:last-child) {
         margin-bottom: 6px !important;
     }
 
+    /* 左の←キー：数字4行分の総高さ（306px）にぴったり合わせる */
     .st-key-prev_w button, .st-key-prev_p button {
         height: 306px !important;
         font-size: 22px !important;
@@ -474,6 +482,8 @@ st.markdown(
         margin-top: 0 !important;
     }
 
+    /* 右カラム：CEは1行目（7,8,9）と同じ72px、→は2行目(4,5,6)の上端から
+       ←キーの下端（306px）までの残り228pxを埋める */
     .st-key-ce_w button, .st-key-ce_p button {
         height: 72px !important;
         font-size: 16px !important;
@@ -566,14 +576,15 @@ if not st.session_state.sidebar_open:
     st.rerun()
 
 # --- サイドバー設定 ---
+# 確定済みの設定値は st.session_state に保持する（保存を押すまでは古い値のまま計算に使う）
 if "settings" not in st.session_state:
   st.session_state.settings = {
       "carcass_price": 2300,
       "daily_cost": 850,
       "shipment_days": 854,
       "birth_weight": 35.0,
-      "yield_rate_mc": 0.645,
-      "yield_rate_f": 0.625,
+      "yield_rate_mc": 0.645,  # 去勢歩留 (64.5%)
+      "yield_rate_f": 0.625,   # 雌歩留 (62.5%)
       "target_profit": 100,
   }
 
@@ -606,6 +617,7 @@ with st.sidebar:
       step=1.0,
       key="input_birth_weight",
   )
+  # 単一の歩留基準から【去勢】【雌】ごとの入力欄へ分割
   input_yield_rate_mc = st.number_input(
       "歩留基準【去勢】",
       value=st.session_state.settings.get("yield_rate_mc", 0.645),
@@ -627,7 +639,11 @@ with st.sidebar:
       key="input_target_profit",
   )
 
-  if st.button("💾 設定を保存", use_container_width=True, type="primary"):
+  if st.button(
+      "💾 設定を保存", use_container_width=True, type="primary"
+  ):
+    # ここで初めて確定値として session_state.settings に書き込む。
+    # これにより「保存」を押したタイミングで確実に再計算対象へ反映される。
     st.session_state.settings = {
         "carcass_price": input_carcass_price,
         "daily_cost": input_daily_cost,
@@ -650,7 +666,8 @@ with st.sidebar:
     st.rerun()
 
 
-# --- 成長曲線パラメータ ---
+# --- 成長曲線パラメータ（牧場実績データ2000件超からフィッティング済み） ---
+# モデル: logistic(t) = A / (1 + B * exp(-k * t))
 GROWTH_CURVE_PARAMS = {
     "雌": {"A": 734.258662, "B": 9.925742, "k": 0.005825},
     "去": {"A": 791.207131, "B": 9.810946, "k": 0.005967},
@@ -659,25 +676,31 @@ GROWTH_CURVE_PARAMS = {
 
 
 def logistic_weight(t, A, B, k):
+  """日齢tにおける成長曲線上の理論体重(kg)"""
   return A / (1 + B * np.exp(-k * t))
 
 
 def logistic_dg(t, A, B, k):
+  """日齢tにおける成長曲線の瞬間傾き＝推定DG(kg/日)"""
   return (A * B * k * np.exp(-k * t)) / ((1 + B * np.exp(-k * t)) ** 2)
 
 
 def get_growth_params(gender):
+  """性別文字列から成長曲線パラメータを取得（不明な場合は「全体」にフォールバック）"""
   return GROWTH_CURVE_PARAMS.get(gender, GROWTH_CURVE_PARAMS["全体"])
 
 
 # --- 計算ロジック ---
 def calculate_cow_metrics(cow_row):
+  # 「保存」ボタンが押されて確定した設定値のみを使う（st.session_state は
+  # フラグメント経由の再実行でも常に最新かつ一貫した値を返す）
   settings = st.session_state.settings
   carcass_price = settings["carcass_price"]
   daily_cost = settings["daily_cost"]
   shipment_days = settings["shipment_days"]
   birth_weight = settings["birth_weight"]
 
+  # 性別の判定と対応する歩留基準の取得
   gender_clean = clean_gender(cow_row.get("性別", "去"))
   yield_rate = (
       settings.get("yield_rate_f", 0.625)
@@ -704,14 +727,22 @@ def calculate_cow_metrics(cow_row):
         "目標落札額": 0,
     }
 
+  # DG（表示用）は従来通り、生時体重からの平均日増体量
   dg = (weight - birth_weight) / days
+
   raising_days = max(0, shipment_days - days)
   cost = int(raising_days * daily_cost)
 
+  # 予測出荷体重だけは成長曲線（非線形・ロジスティックモデル）で算出
   params = get_growth_params(gender_clean)
   A, B, k = params["A"], params["B"], params["k"]
 
+  # 成長曲線上の理論体重と実測体重とのズレをオフセットとして保持し、
+  # 曲線の「形」はそのままにこの牛の実測値に位置合わせする
   offset = weight - logistic_weight(days, A, B, k)
+
+  # 出荷日齢時点の曲線上の理論体重にオフセットを加えて予測出荷体重とする
+  # （万一曲線が下降してもオフセット後に現体重を下回らないようガード）
   pred_ship_weight = max(weight, logistic_weight(shipment_days, A, B, k) + offset)
 
   pred_carcass_weight = pred_ship_weight * yield_rate
@@ -836,7 +867,7 @@ def send_to_kintone(cows_list):
   )
 
 
-# --- セッションステート初期化 ---
+# --- セッションステート初期化（バックアップがあれば自動復元） ---
 if "cows" not in st.session_state:
   if os.path.exists(BACKUP_FILE):
     try:
@@ -893,7 +924,10 @@ if "avg_profit_cache" not in st.session_state:
 if "metrics_dirty" not in st.session_state:
   st.session_state.metrics_dirty = True
 if "reset_ver" not in st.session_state:
+  # チェックボックス等のウィジェットキーに混ぜて、初期化のたびに
+  # 「別物のウィジェット」として確実に作り直させるための世代カウンタ
   st.session_state.reset_ver = 0
+
 
 
 # --- 牛のピクトグラムヘルパー ---
@@ -955,7 +989,6 @@ with tab1:
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
-@st.fragment
 def render_weight_tab():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_w
@@ -999,16 +1032,7 @@ def render_weight_tab():
   display_w = (
       st.session_state.input_buffer_w
       if st.session_state.input_buffer_w != ""
-      else (
-          str(
-              int(cow["体重"])
-              if isinstance(cow["体重"], (int, float))
-              and float(cow["体重"]).is_integer()
-              else cow["体重"]
-          )
-          if cow["体重"] > 0
-          else ""
-      )
+      else (str(cow["体重"]) if cow["体重"] > 0 else "")
   )
 
   card_html_w = (
@@ -1089,7 +1113,7 @@ def render_weight_tab():
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
         st.session_state.input_buffer_w = ""
-        st.session_state.cows[idx]["体重"] = 0.0
+        st.session_state.cows[idx]["体重"] = 0
         st.session_state.metrics_dirty = True
         save_backup()
         st.rerun(scope="fragment")
@@ -1112,21 +1136,15 @@ def render_weight_tab():
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
-@st.fragment
 def render_price_tab():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
-
-  # 数字入力中は全頭集計を走らせずキャッシュ値を使用
-  is_typing = st.session_state.input_buffer_p != ""
-  if st.session_state.metrics_dirty and not is_typing:
+  calc = calculate_cow_metrics(cow)
+  if st.session_state.metrics_dirty:
     st.session_state.avg_profit_cache = calculate_today_avg_profit()
     st.session_state.metrics_dirty = False
   avg_profit = st.session_state.avg_profit_cache
-
-  # 個体の損益分岐点・目標額は常に最新値で計算
-  calc = calculate_cow_metrics(cow)
 
   display_p = (
       st.session_state.input_buffer_p
@@ -1292,14 +1310,15 @@ def render_price_tab():
         st.rerun(scope="fragment")
 
 
-# =========================================================
-# タブ呼び出し（独立したフラグメントとして分離）
-# =========================================================
-with tab2:
-  render_weight_tab()
+@st.fragment
+def render_weight_and_price_tabs():
+  with tab2:
+    render_weight_tab()
+  with tab3:
+    render_price_tab()
 
-with tab3:
-  render_price_tab()
+
+render_weight_and_price_tabs()
 
 
 # =========================================================
@@ -1307,127 +1326,101 @@ with tab3:
 # =========================================================
 @st.fragment
 def render_results_tab():
-  top_col1, top_col2 = st.columns([3, 1])
-  with top_col1:
-    st.subheader("📋 セリ結果一覧表示画面")
-  with top_col2:
-    if st.button(
-        "🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True
-    ):
-      st.rerun(scope="fragment")
-
-  # 1. 本日落札した牛一覧
-  my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
-  st.markdown("#### 🏆 本日落札した牛一覧")
-  if my_cows:
-    df_my = pd.DataFrame(my_cows)[[
-        "No",
-        "個体識別番号",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "体重",
-        "父",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "実際落札額",
-    ]]
-    df_my.columns = [
-        "出場番号",
-        "個体識別番号",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "当日体重(kg)",
-        "父牛",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "落札額(千円)",
-    ]
-    st.dataframe(df_my, use_container_width=True, hide_index=True)
-  else:
-    st.info("自社落札した牛はまだありません。")
-
-  st.divider()
-
-  # 2. 本日のセリ結果一覧（全頭）
-  st.markdown("#### 📑 本日のセリ結果一覧（全頭）")
-  all_rows = []
-  for c in st.session_state.cows:
-    m = calculate_cow_metrics(c)
-    all_rows.append({
-        "出場番号": c["No"],
-        "個体識別番号": c.get("個体識別番号", "") or "-",
-        "性別": c["性別"],
-        "生年月日": c.get("生年月日", "-"),
-        "日齢": c["日齢"],
-        "産次": c.get("産次", "-"),
-        "体重(kg)": c["体重"],
-        "父": c["父"],
-        "母の父": c.get("母の父", "-"),
-        "母の祖父": c.get("母の祖父", "-"),
-        "母の母の祖父": c.get("母の母の祖父", "-"),
-        "摘要": c.get("摘要", "") or "-",
-        "損益分岐点(千円)": m["ボーダー価格"],
-        "落札額(千円)": c["実際落札額"],
-        "購入結果": (
-            "自社落札"
-            if c.get("自社落札", False)
-            else ("他社落札" if c["実際落札額"] > 0 else "-")
-        ),
-    })
-  df_all = pd.DataFrame(all_rows)
-  st.dataframe(df_all, use_container_width=True, hide_index=True)
-
-  st.divider()
-
-  # 3. kintone送信・確認リセットフロー
-  if st.session_state.get("kintone_sent_success"):
-    st.success("✅ kintoneにデータを正常に送信しました！")
-    st.info("💡 入力値をリセットし、次回のセリの準備をします。")
-    if st.button(
-        "🧹 画面をリセットして次のセリへ",
-        type="primary",
-        use_container_width=True,
-    ):
-      clear_backup()
-      clean_cows = []
-      for c in st.session_state.cows:
-        new_c = c.copy()
-        new_c["体重"] = 0
-        new_c["実際落札額"] = 0
-        new_c["自社落札"] = False
-        new_c["マイナス要素"] = []
-        clean_cows.append(new_c)
-
-      next_reset_ver = st.session_state.get("reset_ver", 0) + 1
-      st.session_state.reset_ver = next_reset_ver
-      st.session_state.cows = clean_cows
-      st.session_state.curr_idx_w = 0
-      st.session_state.curr_idx_p = 0
-      st.session_state.input_buffer_w = ""
-      st.session_state.input_buffer_p = ""
-      st.session_state.metrics_dirty = True
-      st.session_state.kintone_sent_success = False
-      st.rerun()
-  else:
-    if st.button(
-        "☁️ タップでkintoneに送る", type="primary", use_container_width=True
-    ):
-      with st.spinner("kintoneにデータを送信中..."):
-        success, msg = send_to_kintone(st.session_state.cows)
-        if success:
-          st.session_state.kintone_sent_success = True
-          st.rerun(scope="fragment")
-        else:
-          st.error(msg)
-
+    top_col1, top_col2 = st.columns([3, 1])
+    with top_col1:
+        st.subheader("📋 セリ結果一覧表示画面")
+    with top_col2:
+        if st.button("🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True):
+            st.rerun(scope="fragment")
+    
+    # 1. 本日落札した牛一覧
+    my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
+    st.markdown("#### 🏆 本日落札した牛一覧")
+    if my_cows:
+        df_my = pd.DataFrame(my_cows)[[
+            "No", "個体識別番号", "性別", "生年月日", "日齢", "産次", "体重",
+            "父", "母の父", "母の祖父", "母の母の祖父", "摘要", "実際落札額"
+        ]]
+        df_my.columns = [
+            "出場番号", "個体識別番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
+            "父牛", "母の父", "母の祖父", "母の母の祖父", "摘要", "落札額(千円)"
+        ]
+        st.dataframe(df_my, use_container_width=True, hide_index=True)
+    else:
+        st.info("自社落札した牛はまだありません。")
+        
+    st.divider()
+    
+    # 2. 本日のセリ結果一覧（全頭）
+    st.markdown("#### 📑 本日のセリ結果一覧（全頭）")
+    all_rows = []
+    for c in st.session_state.cows:
+        m = calculate_cow_metrics(c)
+        all_rows.append({
+            "出場番号": c["No"],
+            "個体識別番号": c.get("個体識別番号", "") or "-",
+            "性別": c["性別"],
+            "生年月日": c.get("生年月日", "-"),
+            "日齢": c["日齢"],
+            "産次": c.get("産次", "-"),
+            "体重(kg)": c["体重"],
+            "父": c["父"],
+            "母の父": c.get("母の父", "-"),
+            "母の祖父": c.get("母の祖父", "-"),
+            "母の母の祖父": c.get("母の母の祖父", "-"),
+            "摘要": c.get("摘要", "") or "-",
+            "損益分岐点(千円)": m["ボーダー価格"],
+            "落札額(千円)": c["実際落札額"],
+            "購入結果": "自社落札" if c.get("自社落札", False) else ("他社落札" if c["実際落札額"] > 0 else "-")
+        })
+    df_all = pd.DataFrame(all_rows)
+    st.dataframe(df_all, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # 3. kintone送信・確認リセットフロー
+    if st.session_state.get("kintone_sent_success"):
+        st.success("✅ kintoneにデータを正常に送信しました！")
+        st.info("💡 入力値をリセットし、次回のセリの準備をします。")
+        if st.button("🧹 画面をリセットして次のセリへ", type="primary", use_container_width=True):
+            # ① バックアップファイルを削除
+            clear_backup()
+            
+            # ② 名簿のベース情報だけ残し、入力した数値をクリア
+            clean_cows = []
+            for c in st.session_state.cows:
+                new_c = c.copy()
+                new_c["体重"] = 0
+                new_c["実際落札額"] = 0
+                new_c["自社落札"] = False
+                new_c["マイナス要素"] = []
+                clean_cows.append(new_c)
+            
+            # 次の世代番号を記録
+            next_reset_ver = st.session_state.get("reset_ver", 0) + 1
+            
+            # ③ 必要なキーだけを個別にリセット
+            #    ※ st.session_state.clear() は使わない。フラグメント
+            #    （@st.fragment）が内部で使うキーまで消してしまい、
+            #    結果一覧タブなどの表示が正しく更新されなくなるため。
+            st.session_state.reset_ver = next_reset_ver
+            st.session_state.cows = clean_cows
+            st.session_state.curr_idx_w = 0
+            st.session_state.curr_idx_p = 0
+            st.session_state.input_buffer_w = ""
+            st.session_state.input_buffer_p = ""
+            st.session_state.metrics_dirty = True
+            st.session_state.kintone_sent_success = False
+            st.rerun()
+    else:
+        if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
+            with st.spinner("kintoneにデータを送信中..."):
+                success, msg = send_to_kintone(st.session_state.cows)
+                if success:
+                    st.session_state.kintone_sent_success = True
+                    st.rerun(scope="fragment")
+                else:
+                    st.error(msg)
 
 with tab4:
-  render_results_tab()
+    render_results_tab()
