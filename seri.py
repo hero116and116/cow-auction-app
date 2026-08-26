@@ -987,12 +987,12 @@ with tab1:
 
 
 # =========================================================
-# JavaScriptネイティブ・テンキー描画ヘルパー
+# JavaScriptネイティブ・テンキー描画ヘルパー（URLクエリ連動方式）
 # =========================================================
 def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit: str):
     """
-    数字入力・CE・Cをブラウザ内JSで0秒即時反映し、
-    決定・←・→が押された時のみ親画面へ値を渡してPythonをトリガーする。
+    数字・CE・Cはブラウザ内JSで0秒即時反映。
+    決定・←・→が押された時は親画面のURLクエリパラメータを書き換えてPython側へ通知する。
     """
     html_code = f"""
     <!DOCTYPE html>
@@ -1126,7 +1126,7 @@ def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit
 
       <div class="numpad-container">
         <div class="col-left">
-          <button class="btn-prev" onclick="sendAction('prev')">←</button>
+          <button class="btn-prev" onclick="triggerAction('prev')">←</button>
         </div>
         <div class="col-center">
           <div class="num-row">
@@ -1147,12 +1147,12 @@ def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit
           <div class="num-row">
             <button class="btn-num btn-c" onclick="clearVal()">C</button>
             <button class="btn-num" onclick="appendNum('0')">0</button>
-            <button class="btn-num btn-enter" onclick="sendAction('enter')">決定</button>
+            <button class="btn-num btn-enter" onclick="triggerAction('enter')">決定</button>
           </div>
         </div>
         <div class="col-right">
           <button class="btn-ce" onclick="backspaceVal()">CE</button>
-          <button class="btn-next" onclick="sendAction('next')">→</button>
+          <button class="btn-next" onclick="triggerAction('next')">→</button>
         </div>
       </div>
 
@@ -1178,18 +1178,17 @@ def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit
         function clearVal() {{
           currentVal = "";
           updateDisplay();
-          sendAction('clear');
+          triggerAction('clear');
         }}
 
-        function sendAction(actionType) {{
-          const payload = {{
-            action: actionType,
-            val: currentVal,
-            target: "{target_mode}",
-            cow_id: {cow_id},
-            ts: Date.now()
-          }};
-          window.parent.postMessage({{ type: "SERI_NUMPAD_ACTION", payload: payload }}, "*");
+        function triggerAction(actionType) {{
+          const params = new URLSearchParams(window.parent.location.search);
+          params.set("act", actionType);
+          params.set("tgt", "{target_mode}");
+          params.set("cid", "{cow_id}");
+          params.set("val", currentVal);
+          params.set("_ts", Date.now().toString());
+          window.parent.location.search = params.toString();
         }}
       </script>
     </body>
@@ -1198,273 +1197,219 @@ def render_native_numpad(target_mode: str, cow_id: int, initial_value: str, unit
     st_html(html_code, height=385)
 
 
-# --- 親画面側の postMessage 受信・セッション反映スクリプト ---
-_NUMPAD_LISTENER_HTML = r"""
-<script>
-(function() {
-  if (!window.parent.__seriNumpadListenerAttached) {
-    window.parent.__seriNumpadListenerAttached = true;
-    window.addEventListener("message", function(event) {
-      if (event.data && event.data.type === "SERI_NUMPAD_ACTION") {
-        const payload = event.data.payload;
-        const hiddenInput = window.parent.document.getElementById("seri_numpad_bridge");
-        if (hiddenInput) {
-          hiddenInput.value = JSON.stringify(payload);
-          hiddenInput.dispatchEvent(new Event("input", { bubbles: true }));
-          hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-      }
-    });
-  }
-})();
-</script>
-"""
-st_html(_NUMPAD_LISTENER_HTML, height=0, width=0)
+# --- URLクエリ経由のテンキーアクション処理 ---
+if "act" in st.query_params:
+    action = st.query_params.get("act")
+    target = st.query_params.get("tgt")
+    cow_id = int(st.query_params.get("cid", 0))
+    val_str = st.query_params.get("val", "")
+    total = len(st.session_state.cows)
+
+    if target == "weight":
+        parsed_val = float(val_str) if val_str else 0.0
+        if action == "clear":
+            st.session_state.cows[cow_id]["体重"] = 0.0
+            st.session_state.metrics_dirty = True
+            save_backup()
+        elif action == "enter":
+            st.session_state.cows[cow_id]["体重"] = parsed_val
+            st.session_state.metrics_dirty = True
+            save_backup()
+        elif action == "prev":
+            if val_str:
+                st.session_state.cows[cow_id]["体重"] = parsed_val
+                st.session_state.metrics_dirty = True
+                save_backup()
+            st.session_state.curr_idx_w = max(0, cow_id - 1)
+        elif action == "next":
+            if val_str:
+                st.session_state.cows[cow_id]["体重"] = parsed_val
+                st.session_state.metrics_dirty = True
+                save_backup()
+            st.session_state.curr_idx_w = min(total - 1, cow_id + 1)
+
+    elif target == "price":
+        parsed_val = int(val_str) if val_str else 0
+        if action == "clear":
+            st.session_state.cows[cow_id]["実際落札額"] = 0
+            st.session_state.metrics_dirty = True
+            save_backup()
+        elif action == "enter":
+            st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+            st.session_state.metrics_dirty = True
+            save_backup()
+        elif action == "prev":
+            if val_str:
+                st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+                st.session_state.metrics_dirty = True
+                save_backup()
+            st.session_state.curr_idx_p = max(0, cow_id - 1)
+        elif action == "next":
+            if val_str:
+                st.session_state.cows[cow_id]["実際落札額"] = parsed_val
+                st.session_state.metrics_dirty = True
+                save_backup()
+            st.session_state.curr_idx_p = min(total - 1, cow_id + 1)
+
+    # クエリパラメータをクリアして二重実行を防止
+    st.query_params.clear()
+    st.rerun()
 
 
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
 def render_weight_tab():
-  total = len(st.session_state.cows)
-  idx = st.session_state.curr_idx_w
-  cow = st.session_state.cows[idx]
+    total = len(st.session_state.cows)
+    idx = st.session_state.curr_idx_w
+    cow = st.session_state.cows[idx]
 
-  with st.container(key="no_jump_w"):
-    with st.popover(f"No.{cow['No']} ✎"):
-      nos = [c["No"] for c in st.session_state.cows]
-      target_no = st.number_input(
-          "出場番号を入力して移動",
-          min_value=int(min(nos)),
-          max_value=int(max(nos)),
-          value=int(cow["No"]),
-          step=1,
-          key=f"jump_no_w_{idx}",
-      )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
+    with st.container(key="no_jump_w"):
+        with st.popover(f"No.{cow['No']} ✎"):
+            nos = [c["No"] for c in st.session_state.cows]
+            target_no = st.number_input(
+                "出場番号を入力して移動",
+                min_value=int(min(nos)),
+                max_value=int(max(nos)),
+                value=int(cow["No"]),
+                step=1,
+                key=f"jump_no_w_{idx}",
+            )
+            if st.button("この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True):
+                target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
+                if target_idx is not None:
+                    st.session_state.curr_idx_w = target_idx
+                    st.rerun(scope="fragment")
+                else:
+                    st.warning("その出場番号は見つかりませんでした。")
+
+    # 上部カード（ピクトグラム・属性情報）
+    card_html_w = (
+        '<div class="screen-card" style="margin-bottom: 0px; border-bottom: none; border-radius: 4px 4px 0 0;">'
+        '<div class="card-top">'
+        f'{get_cow_svg(cow["No"])}'
+        '<div class="cow-meta" style="margin-top: 4px;">'
+        f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父: <b>{cow["父"]}</b>'
+        '</div>'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(card_html_w, unsafe_allow_html=True)
+
+    with st.container(key="negative_factors_area_w"):
+        current_negs = cow.get("マイナス要素", [])
+        selected_negs = st.pills(
+            "マイナス要素（該当する場合のみ選択）",
+            options=NEGATIVE_FACTORS,
+            selection_mode="multi",
+            default=[f for f in current_negs if f in NEGATIVE_FACTORS],
+            key=f"neg_pills_{st.session_state.reset_ver}_{idx}",
+            label_visibility="collapsed",
         )
-        if target_idx is not None:
-          st.session_state.curr_idx_w = target_idx
-          st.rerun(scope="fragment")
-        else:
-          st.warning("その出場番号は見つかりませんでした。")
+        new_negs = [f for f in NEGATIVE_FACTORS if f in selected_negs] if selected_negs else []
+        if set(new_negs) != set(current_negs):
+            st.session_state.cows[idx]["マイナス要素"] = new_negs
+            save_backup()
 
-  # 上部カード（ピクトグラム・属性情報）
-  card_html_w = (
-      '<div class="screen-card" style="margin-bottom: 0px; border-bottom:'
-      ' none; border-radius: 4px 4px 0 0;">'
-      '<div class="card-top">'
-      f'{get_cow_svg(cow["No"])}'
-      '<div class="cow-meta" style="margin-top: 4px;">'
-      f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父:'
-      f' <b>{cow["父"]}</b>'
-      "</div>"
-      "</div>"
-      "</div>"
-  )
-  st.markdown(card_html_w, unsafe_allow_html=True)
-
-  with st.container(key="negative_factors_area_w"):
-    current_negs = cow.get("マイナス要素", [])
-    selected_negs = st.pills(
-        "マイナス要素（該当する場合のみ選択）",
-        options=NEGATIVE_FACTORS,
-        selection_mode="multi",
-        default=[f for f in current_negs if f in NEGATIVE_FACTORS],
-        key=f"neg_pills_{st.session_state.reset_ver}_{idx}",
-        label_visibility="collapsed",
-    )
-    new_negs = (
-        [f for f in NEGATIVE_FACTORS if f in selected_negs]
-        if selected_negs
-        else []
-    )
-    if set(new_negs) != set(current_negs):
-      st.session_state.cows[idx]["マイナス要素"] = new_negs
-      save_backup()
-
-  # ネイティブ高速テンキー（枠線下部を結合）
-  with st.container(key="numpad_area_w"):
-    init_val = str(cow["体重"]) if cow["体重"] > 0 else ""
-    render_native_numpad("weight", idx, init_val, "kg")
+    # ネイティブ高速テンキー
+    with st.container(key="numpad_area_w"):
+        init_val = str(int(cow["体重"]) if cow["体重"].is_integer() else cow["体重"]) if isinstance(cow["体重"], (int, float)) and cow["体重"] > 0 else (str(cow["体重"]) if cow["体重"] else "")
+        render_native_numpad("weight", idx, init_val, "kg")
 
 
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
 def render_price_tab():
-  total = len(st.session_state.cows)
-  idx = st.session_state.curr_idx_p
-  cow = st.session_state.cows[idx]
-
-  if st.session_state.metrics_dirty:
-    st.session_state.avg_profit_cache = calculate_today_avg_profit()
-    st.session_state.metrics_dirty = False
-  avg_profit = st.session_state.avg_profit_cache
-
-  calc = calculate_cow_metrics(cow)
-
-  neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
-  neg_badges_html = "".join(
-      f'<span class="neg-badge">{n}</span>' for n in neg_factors
-  )
-
-  with st.container(key="no_jump_p"):
-    with st.popover(f"No.{cow['No']} ✎"):
-      nos = [c["No"] for c in st.session_state.cows]
-      target_no = st.number_input(
-          "出場番号を入力して移動",
-          min_value=int(min(nos)),
-          max_value=int(max(nos)),
-          value=int(cow["No"]),
-          step=1,
-          key=f"jump_no_p_{idx}",
-      )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
-        )
-        if target_idx is not None:
-          st.session_state.curr_idx_p = target_idx
-          st.rerun(scope="fragment")
-        else:
-          st.warning("その出場番号は見つかりませんでした。")
-
-  try:
-    price_for_unit = int(cow["実際落札額"])
-  except (ValueError, TypeError):
-    price_for_unit = 0
-  try:
-    weight_for_unit = float(cow["体重"])
-  except (ValueError, TypeError):
-    weight_for_unit = 0
-  unit_price = (
-      int(round(price_for_unit * 1000 / weight_for_unit))
-      if weight_for_unit > 0 and price_for_unit > 0
-      else 0
-  )
-  unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
-
-  card_html_p = (
-      '<div class="screen-card" style="margin-bottom: 0px; border-bottom:'
-      ' none; border-radius: 4px 4px 0 0;">'
-      '<div class="card-top">'
-      '<div class="cow-top-row">'
-      '<div class="cow-info-col cow-meta">'
-      f'日齢: <b>{cow["日齢"]}日</b><br>'
-      f'体重: <b>{cow["体重"]}kg</b><br>'
-      f'父: <b>{cow["父"]}</b><br>'
-      f'DG: <b>{calc["DG"]}kg/日</b><br>'
-      f"kg単価:<br><b>{unit_price_text}</b><br>"
-      f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
-      "</div>"
-      f'<div class="cow-icon-col">{get_cow_svg(cow["No"])}</div>'
-      f'<div class="cow-neg-col">{neg_badges_html}</div>'
-      "</div>"
-      '<div class="cow-metrics">'
-      f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
-      f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
-      f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
-      "</div>"
-      "</div>"
-      '<div class="card-divider"></div>'
-      "</div>"
-  )
-  st.markdown(card_html_p, unsafe_allow_html=True)
-
-  with st.container(key="purchase_check_area_p"):
-    purchased = st.checkbox(
-        "購入チェック",
-        value=cow["自社落札"],
-        key=f"buy_check_{st.session_state.reset_ver}_{idx}",
-    )
-    if purchased != cow["自社落札"]:
-      st.session_state.cows[idx]["自社落札"] = purchased
-      st.session_state.metrics_dirty = True
-      save_backup()
-
-  # ネイティブ高速テンキー
-  with st.container(key="numpad_area_p"):
-    init_val = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
-    render_native_numpad("price", idx, init_val, "千円")
-
-
-# --- テンキーの決定・遷移イベントを受け取るブリッジ処理 ---
-bridge_val = st.text_input("numpad_bridge", key="seri_numpad_bridge", label_visibility="collapsed")
-if bridge_val:
-  try:
-    ev = json.loads(bridge_val)
-    action = ev.get("action")
-    val_str = ev.get("val", "")
-    target = ev.get("target")
-    cow_id = ev.get("cow_id")
     total = len(st.session_state.cows)
+    idx = st.session_state.curr_idx_p
+    cow = st.session_state.cows[idx]
 
-    if target == "weight":
-      parsed_val = float(val_str) if val_str else 0.0
-      if action == "clear":
-        st.session_state.cows[cow_id]["体重"] = 0.0
-        st.session_state.metrics_dirty = True
-        save_backup()
-      elif action == "enter":
-        st.session_state.cows[cow_id]["体重"] = parsed_val
-        st.session_state.metrics_dirty = True
-        save_backup()
-      elif action == "prev":
-        if val_str:
-          st.session_state.cows[cow_id]["体重"] = parsed_val
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = max(0, cow_id - 1)
-      elif action == "next":
-        if val_str:
-          st.session_state.cows[cow_id]["体重"] = parsed_val
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = min(total - 1, cow_id + 1)
+    if st.session_state.metrics_dirty:
+        st.session_state.avg_profit_cache = calculate_today_avg_profit()
+        st.session_state.metrics_dirty = False
+    avg_profit = st.session_state.avg_profit_cache
 
-    elif target == "price":
-      parsed_val = int(val_str) if val_str else 0
-      if action == "clear":
-        st.session_state.cows[cow_id]["実際落札額"] = 0
-        st.session_state.metrics_dirty = True
-        save_backup()
-      elif action == "enter":
-        st.session_state.cows[cow_id]["実際落札額"] = parsed_val
-        st.session_state.metrics_dirty = True
-        save_backup()
-      elif action == "prev":
-        if val_str:
-          st.session_state.cows[cow_id]["実際落札額"] = parsed_val
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_p = max(0, cow_id - 1)
-      elif action == "next":
-        if val_str:
-          st.session_state.cows[cow_id]["実際落札額"] = parsed_val
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_p = min(total - 1, cow_id + 1)
+    calc = calculate_cow_metrics(cow)
 
-    st.rerun(scope="fragment")
-  except Exception:
-    pass
+    neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
+    neg_badges_html = "".join(f'<span class="neg-badge">{n}</span>' for n in neg_factors)
+
+    with st.container(key="no_jump_p"):
+        with st.popover(f"No.{cow['No']} ✎"):
+            nos = [c["No"] for c in st.session_state.cows]
+            target_no = st.number_input(
+                "出場番号を入力して移動",
+                min_value=int(min(nos)),
+                max_value=int(max(nos)),
+                value=int(cow["No"]),
+                step=1,
+                key=f"jump_no_p_{idx}",
+            )
+            if st.button("この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True):
+                target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
+                if target_idx is not None:
+                    st.session_state.curr_idx_p = target_idx
+                    st.rerun(scope="fragment")
+                else:
+                    st.warning("その出場番号は見つかりませんでした。")
+
+    try:
+        price_for_unit = int(cow["実際落札額"])
+    except (ValueError, TypeError):
+        price_for_unit = 0
+    try:
+        weight_for_unit = float(cow["体重"])
+    except (ValueError, TypeError):
+        weight_for_unit = 0
+    unit_price = (
+        int(round(price_for_unit * 1000 / weight_for_unit))
+        if weight_for_unit > 0 and price_for_unit > 0
+        else 0
+    )
+    unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
+
+    card_html_p = (
+        '<div class="screen-card" style="margin-bottom: 0px; border-bottom: none; border-radius: 4px 4px 0 0;">'
+        '<div class="card-top">'
+        '<div class="cow-top-row">'
+        '<div class="cow-info-col cow-meta">'
+        f'日齢: <b>{cow["日齢"]}日</b><br>'
+        f'体重: <b>{cow["体重"]}kg</b><br>'
+        f'父: <b>{cow["父"]}</b><br>'
+        f'DG: <b>{calc["DG"]}kg/日</b><br>'
+        f'kg単価:<br><b>{unit_price_text}</b><br>'
+        f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
+        '</div>'
+        f'<div class="cow-icon-col">{get_cow_svg(cow["No"])}</div>'
+        f'<div class="cow-neg-col">{neg_badges_html}</div>'
+        '</div>'
+        '<div class="cow-metrics">'
+        f'本日の推定平均利益 <span class="profit">{avg_profit}</span>(千円)<br>'
+        f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
+        f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
+        '</div>'
+        '</div>'
+        '<div class="card-divider"></div>'
+        '</div>'
+    )
+    st.markdown(card_html_p, unsafe_allow_html=True)
+
+    with st.container(key="purchase_check_area_p"):
+        purchased = st.checkbox(
+            "購入チェック",
+            value=cow["自社落札"],
+            key=f"buy_check_{st.session_state.reset_ver}_{idx}",
+        )
+        if purchased != cow["自社落札"]:
+            st.session_state.cows[idx]["自社落札"] = purchased
+            st.session_state.metrics_dirty = True
+            save_backup()
+
+    # ネイティブ高速テンキー
+    with st.container(key="numpad_area_p"):
+        init_val = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
+        render_native_numpad("price", idx, init_val, "千円")
 
 
 @st.fragment
