@@ -1347,7 +1347,7 @@ with tab3:
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面（平均線つき）
+# 画面4: kg単価推移グラフ画面（500刻み軸 ＆ 平均線つき）
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1372,30 +1372,33 @@ with tab4:
     
     import altair as alt
     
-    # 平均値を計算
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
 
-    # 折れ線グラフのベース
+    # 折れ線グラフ（Y軸のメモリ値を明確に指定）
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
         y=alt.Y(
             'kg単価(円):Q', 
-            scale=alt.Scale(domain=[1000, 3500]), 
-            axis=alt.Axis(values=[1000, 1500, 2000, 2500, 3000, 3500]), 
+            scale=alt.Scale(domain=[1000, 3500], zero=False), 
+            axis=alt.Axis(
+                values=[1000, 1500, 2000, 2500, 3000, 3500],
+                tickCount=6,
+                grid=True
+            ), 
             title='kg単価 (円)'
         )
     )
     
-    # 平均値の横線（ルール）
+    # 平均値の横線（破線）
     rule_chart = alt.Chart(pd.DataFrame({'y': [avg_kp]})).mark_rule(
-        color='#059669',  # 緑系の色
-        strokeDash=[5, 5],  # 破線にする設定
+        color='#059669',
+        strokeDash=[5, 5],
         strokeWidth=2
     ).encode(
         y='y:Q'
     )
     
-    # グラフと横線を重ねる
+    # グラフと平均線を重ねる
     chart = alt.layer(line_chart, rule_chart).properties(
         height=300
     )
