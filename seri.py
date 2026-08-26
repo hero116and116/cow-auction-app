@@ -1347,7 +1347,7 @@ with tab3:
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面
+# 画面4: kg単価推移グラフ画面（平均線つき）
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1372,10 +1372,31 @@ with tab4:
     
     import altair as alt
     
-    chart = alt.Chart(df_g).mark_line(point=True).encode(
+    # 平均値を計算
+    avg_kp = int(round(df_g["kg単価(円)"].mean()))
+
+    # 折れ線グラフのベース
+    line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
-        y=alt.Y('kg単価(円):Q', scale=alt.Scale(domain=[1000, 3500]), title='kg単価 (円)')
-    ).properties(
+        y=alt.Y(
+            'kg単価(円):Q', 
+            scale=alt.Scale(domain=[1000, 3500]), 
+            axis=alt.Axis(values=[1000, 1500, 2000, 2500, 3000, 3500]), 
+            title='kg単価 (円)'
+        )
+    )
+    
+    # 平均値の横線（ルール）
+    rule_chart = alt.Chart(pd.DataFrame({'y': [avg_kp]})).mark_rule(
+        color='#059669',  # 緑系の色
+        strokeDash=[5, 5],  # 破線にする設定
+        strokeWidth=2
+    ).encode(
+        y='y:Q'
+    )
+    
+    # グラフと横線を重ねる
+    chart = alt.layer(line_chart, rule_chart).properties(
         height=300
     )
     
@@ -1383,7 +1404,6 @@ with tab4:
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
-    avg_kp = int(df_g["kg単価(円)"].mean())
     
     col_stat1, col_stat2, col_stat3 = st.columns(3)
     col_stat1.metric("最低 kg単価", f"{min_kp:,} 円")
