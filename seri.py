@@ -457,9 +457,22 @@ st.markdown(
         color: #dc2626 !important;
     }
 
-    .st-key-prev_w button, .st-key-next_w button,
-    .st-key-prev_p button, .st-key-next_p button {
-        height: 300px !important;
+    /* numpad_area_w 内の各「行」（要素コンテナ）の縦間隔を、横方向の
+       gap(6px)と揃えて明示的に統一する。各カラム内では最後の要素は
+       自動的に :last-child になるため、個々のボタン自体には影響しない。
+       これにより 数字4行 = 72px×4 + 6px×3 = 306px という総高さを
+       算数で正確に把握でき、右カラムのCE/→の高さもそれに合わせて
+       ズレなく計算できる。 */
+    .st-key-numpad_area_w div[data-testid="element-container"] {
+        margin: 0 !important;
+    }
+    .st-key-numpad_area_w div[data-testid="element-container"]:not(:last-child) {
+        margin-bottom: 6px !important;
+    }
+
+    /* 左の←キー：数字4行分の総高さ（306px）にぴったり合わせる */
+    .st-key-prev_w button, .st-key-prev_p button {
+        height: 306px !important;
         font-size: 22px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
@@ -469,32 +482,10 @@ st.markdown(
         margin-top: 0 !important;
     }
 
-    /* 右カラム（CE＋→）を縦積みにし、CEを9の右隣＝1行分の高さに固定、
-       →は残りの高さいっぱいに広げる */
-    .st-key-numpad_right_w, .st-key-numpad_right_p {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 6px !important;
-        height: 300px !important;
-    }
-    .st-key-numpad_right_w div[data-testid="element-container"]:first-child,
-    .st-key-numpad_right_p div[data-testid="element-container"]:first-child {
-        flex: 0 0 72px !important;
-    }
-    .st-key-numpad_right_w div[data-testid="element-container"]:last-child,
-    .st-key-numpad_right_p div[data-testid="element-container"]:last-child {
-        flex: 1 1 auto !important;
-        min-height: 0 !important;
-    }
-    .st-key-numpad_right_w div[data-testid="stButton"],
-    .st-key-numpad_right_p div[data-testid="stButton"] {
-        height: 100% !important;
-    }
-    .st-key-next_w button, .st-key-next_p button {
-        height: 100% !important;
-    }
+    /* 右カラム：CEは1行目（7,8,9）と同じ72px、→は2行目(4,5,6)の上端から
+       ←キーの下端（306px）までの残り228pxを埋める */
     .st-key-ce_w button, .st-key-ce_p button {
-        height: 100% !important;
+        height: 72px !important;
         font-size: 16px !important;
         font-weight: 700 !important;
         border-radius: 4px !important;
@@ -506,6 +497,16 @@ st.markdown(
     .st-key-ce_w button:hover, .st-key-ce_p button:hover {
         border-color: #3b82f6 !important;
         color: #3b82f6 !important;
+    }
+    .st-key-next_w button, .st-key-next_p button {
+        height: 228px !important;
+        font-size: 22px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        margin-top: 0 !important;
     }
     
     [data-testid="stToolbar"],
