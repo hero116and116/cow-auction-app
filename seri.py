@@ -468,6 +468,45 @@ st.markdown(
         color: #1e293b !important;
         margin-top: 0 !important;
     }
+
+    /* 右カラム（CE＋→）を縦積みにし、CEを9の右隣＝1行分の高さに固定、
+       →は残りの高さいっぱいに広げる */
+    .st-key-numpad_right_w, .st-key-numpad_right_p {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        height: 300px !important;
+    }
+    .st-key-numpad_right_w div[data-testid="element-container"]:first-child,
+    .st-key-numpad_right_p div[data-testid="element-container"]:first-child {
+        flex: 0 0 72px !important;
+    }
+    .st-key-numpad_right_w div[data-testid="element-container"]:last-child,
+    .st-key-numpad_right_p div[data-testid="element-container"]:last-child {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+    }
+    .st-key-numpad_right_w div[data-testid="stButton"],
+    .st-key-numpad_right_p div[data-testid="stButton"] {
+        height: 100% !important;
+    }
+    .st-key-next_w button, .st-key-next_p button {
+        height: 100% !important;
+    }
+    .st-key-ce_w button, .st-key-ce_p button {
+        height: 100% !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #fff7ed !important;
+        color: #c2410c !important;
+        padding: 0 !important;
+    }
+    .st-key-ce_w button:hover, .st-key-ce_p button:hover {
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
     
     [data-testid="stToolbar"],
     [data-testid="stAppToolbar"],
@@ -1047,16 +1086,21 @@ def render_weight_tab():
         st.rerun(scope="fragment")
 
     with col_r:
-      if st.button("→", key="next_w", use_container_width=True):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = min(total - 1, idx + 1)
-        st.session_state.input_buffer_w = ""
-        st.rerun(scope="fragment")
+      with st.container(key="numpad_right_w"):
+        if st.button("CE", key="ce_w", use_container_width=True):
+          st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
+          st.rerun(scope="fragment")
+
+        if st.button("→", key="next_w", use_container_width=True):
+          if st.session_state.input_buffer_w:
+            st.session_state.cows[idx]["体重"] = float(
+                st.session_state.input_buffer_w
+            )
+            st.session_state.metrics_dirty = True
+            save_backup()
+          st.session_state.curr_idx_w = min(total - 1, idx + 1)
+          st.session_state.input_buffer_w = ""
+          st.rerun(scope="fragment")
 
     with col_pad:
       for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
@@ -1219,16 +1263,21 @@ def render_price_tab():
         st.rerun(scope="fragment")
 
     with col_r:
-      if st.button("→", key="next_p", use_container_width=True):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_p = min(total - 1, idx + 1)
-        st.session_state.input_buffer_p = ""
-        st.rerun(scope="fragment")
+      with st.container(key="numpad_right_p"):
+        if st.button("CE", key="ce_p", use_container_width=True):
+          st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
+          st.rerun(scope="fragment")
+
+        if st.button("→", key="next_p", use_container_width=True):
+          if st.session_state.input_buffer_p:
+            st.session_state.cows[idx]["実際落札額"] = int(
+                st.session_state.input_buffer_p
+            )
+            st.session_state.metrics_dirty = True
+            save_backup()
+          st.session_state.curr_idx_p = min(total - 1, idx + 1)
+          st.session_state.input_buffer_p = ""
+          st.rerun(scope="fragment")
 
     with col_pad:
       for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
