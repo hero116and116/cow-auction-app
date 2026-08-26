@@ -804,6 +804,7 @@ def send_to_kintone(cows_list):
           "皮膚の伸びが悪い": {"value": ["該当"] if "皮膚の伸びが悪い" in negs else []},
           "背中が曲がっている": {"value": ["該当"] if "背中が曲がっている" in negs else []},
           "落札上限価格": {"value": calc["ボーダー価格"]},
+          "予測出荷体重": {"value": calc["予測出荷体重"]},
           "実際落札額": {"value": price},
           "購入結果": {"value": status},
           "設定枝肉単価": {"value": settings["carcass_price"]},
