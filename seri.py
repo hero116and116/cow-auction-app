@@ -894,8 +894,6 @@ if "metrics_dirty" not in st.session_state:
   st.session_state.metrics_dirty = True
 if "reset_ver" not in st.session_state:
   st.session_state.reset_ver = 0
-if "show_price_graph" not in st.session_state:
-  st.session_state.show_price_graph = False
 
 
 # --- 牛のピクトグラムヘルパー ---
@@ -907,11 +905,12 @@ def get_cow_svg(number_str):
   return html
 
 
-# --- メインタブ ---
-tab1, tab2, tab3, tab4 = st.tabs([
+# --- メインタブ（5タブ構成に変更） ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📷 事前データ自動読み取り",
     "⚖️ 体重入力（下見）",
     "🎯 落札価格入力（本番）",
+    "📈 kg単価推移グラフ",
     "📊 セリ結果一覧",
 ])
 
@@ -1207,34 +1206,6 @@ with tab3:
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
 
-  # --- 📈 kg単価推移グラフの開閉エリア ---
-  if not st.session_state.show_price_graph:
-    if st.button("📈 kg単価の推移グラフを表示", use_container_width=True):
-      st.session_state.show_price_graph = True
-      st.rerun()
-  else:
-    with st.container(border=True):
-      st.markdown("#### 📊 落札kg単価の推移")
-      graph_data = []
-      for c in st.session_state.cows:
-        p = c.get("実際落札額", 0)
-        w = c.get("体重", 0)
-        if p and p > 0 and w and w > 0:
-          kp = int(round(p * 1000 / w))
-          graph_data.append(
-              {"出場番号": f"No.{c['No']}", "kg単価": kp, "raw_no": c["No"]}
-          )
-
-      if graph_data:
-        df_g = pd.DataFrame(graph_data).sort_values("raw_no")
-        st.line_chart(df_g.set_index("出場番号")["kg単価"], use_container_width=True)
-      else:
-        st.info("まだ落札額が入力されたデータがありません。")
-
-      if st.button("❌ 閉じる", key="close_graph_btn", use_container_width=True):
-        st.session_state.show_price_graph = False
-        st.rerun()
-
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
         "購入チェック",
@@ -1309,9 +1280,48 @@ with tab3:
 
 
 # =========================================================
-# 画面4: セリ結果一覧表示画面
+# 画面4: kg単価推移グラフ画面（新設）
 # =========================================================
 with tab4:
+  st.subheader("📈 kg単価の推移グラフ")
+  st.markdown("これまでの落札データのkg単価の推移を確認できます。")
+
+  if st.button("🔄 グラフを更新", key="graph_manual_refresh", use_container_width=True):
+    st.rerun()
+
+  graph_data = []
+  for c in st.session_state.cows:
+    p = c.get("実際落札額", 0)
+    w = c.get("体重", 0)
+    if p and p > 0 and w and w > 0:
+      kp = int(round(p * 1000 / w))
+      graph_data.append({
+          "出場番号": f"No.{c['No']}",
+          "kg単価(円)": kp,
+          "raw_no": c["No"]
+      })
+
+  if graph_data:
+    df_g = pd.DataFrame(graph_data).sort_values("raw_no")
+    st.line_chart(df_g.set_index("出場番号")["kg単価(円)"], use_container_width=True)
+    
+    # 簡易統計情報
+    min_kp = df_g["kg単価(円)"].min()
+    max_kp = df_g["kg単価(円)"].max()
+    avg_kp = int(df_g["kg単価(円)"].mean())
+    
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    col_stat1.metric("最低 kg単価", f"{min_kp:,} 円")
+    col_stat2.metric("平均 kg単価", f"{avg_kp:,} 円")
+    col_stat3.metric("最高 kg単価", f"{max_kp:,} 円")
+  else:
+    st.info("まだ落札額と体重が入力されたデータがありません。")
+
+
+# =========================================================
+# 画面5: セリ結果一覧表示画面
+# =========================================================
+with tab5:
   top_col1, top_col2 = st.columns([3, 1])
   with top_col1:
     st.subheader("📋 セリ結果一覧表示画面")
