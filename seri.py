@@ -894,6 +894,8 @@ if "metrics_dirty" not in st.session_state:
   st.session_state.metrics_dirty = True
 if "reset_ver" not in st.session_state:
   st.session_state.reset_ver = 0
+if "show_price_graph" not in st.session_state:
+  st.session_state.show_price_graph = False
 
 
 # --- 牛のピクトグラムヘルパー ---
@@ -955,7 +957,7 @@ with tab1:
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
-def render_weight_tab():
+with tab2:
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
@@ -991,7 +993,7 @@ def render_weight_tab():
             save_backup()
           st.session_state.curr_idx_w = target_idx
           st.session_state.input_buffer_w = ""
-          st.rerun()  # ページ全体を更新して全タブの計算を同期
+          st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
@@ -1050,13 +1052,13 @@ def render_weight_tab():
           save_backup()
         st.session_state.curr_idx_w = max(0, idx - 1)
         st.session_state.input_buffer_w = ""
-        st.rerun()  # ページ全体を更新して全タブの計算を同期
+        st.rerun()
 
     with col_r:
       with st.container(key="numpad_right_w"):
         if st.button("CE", key="ce_w", use_container_width=True):
           st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun(scope="fragment")
+          st.rerun()
 
         if st.button("→", key="next_w", use_container_width=True):
           if st.session_state.input_buffer_w:
@@ -1067,7 +1069,7 @@ def render_weight_tab():
             save_backup()
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
           st.session_state.input_buffer_w = ""
-          st.rerun()  # ページ全体を更新して全タブの計算を同期
+          st.rerun()
 
     with col_pad:
       for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
@@ -1075,17 +1077,17 @@ def render_weight_tab():
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
             st.session_state.input_buffer_w += num
-            st.rerun(scope="fragment")
+            st.rerun()
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
         st.session_state.input_buffer_w = ""
         st.session_state.cows[idx]["体重"] = 0
         st.session_state.metrics_dirty = True
         save_backup()
-        st.rerun()  # ページ全体を更新して全タブの計算を同期
+        st.rerun()
       if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
         st.session_state.input_buffer_w += "0"
-        st.rerun(scope="fragment")
+        st.rerun()
       if cols_bottom[2].button(
           "決定", key="btn_w_enter", use_container_width=True
       ):
@@ -1096,25 +1098,22 @@ def render_weight_tab():
           st.session_state.metrics_dirty = True
           save_backup()
         st.session_state.input_buffer_w = ""
-        st.rerun()  # ページ全体を更新して全タブの計算を同期
+        st.rerun()
 
 
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
-def render_price_tab():
+with tab3:
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  # 数字入力中以外は最新データに基づいてキャッシュを更新
-  is_typing = st.session_state.input_buffer_p != ""
-  if st.session_state.metrics_dirty and not is_typing:
+  if st.session_state.metrics_dirty:
     st.session_state.avg_profit_cache = calculate_today_avg_profit()
     st.session_state.metrics_dirty = False
   avg_profit = st.session_state.avg_profit_cache
 
-  # 個体の損益分岐点・目標額は常に最新の体重データを元に計算
   calc = calculate_cow_metrics(cow)
 
   display_p = (
@@ -1208,6 +1207,34 @@ def render_price_tab():
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
 
+  # --- 📈 kg単価推移グラフの開閉エリア ---
+  if not st.session_state.show_price_graph:
+    if st.button("📈 kg単価の推移グラフを表示", use_container_width=True):
+      st.session_state.show_price_graph = True
+      st.rerun()
+  else:
+    with st.container(border=True):
+      st.markdown("#### 📊 落札kg単価の推移")
+      graph_data = []
+      for c in st.session_state.cows:
+        p = c.get("実際落札額", 0)
+        w = c.get("体重", 0)
+        if p and p > 0 and w and w > 0:
+          kp = int(round(p * 1000 / w))
+          graph_data.append(
+              {"出場番号": f"No.{c['No']}", "kg単価": kp, "raw_no": c["No"]}
+          )
+
+      if graph_data:
+        df_g = pd.DataFrame(graph_data).sort_values("raw_no")
+        st.line_chart(df_g.set_index("出場番号")["kg単価"], use_container_width=True)
+      else:
+        st.info("まだ落札額が入力されたデータがありません。")
+
+      if st.button("❌ 閉じる", key="close_graph_btn", use_container_width=True):
+        st.session_state.show_price_graph = False
+        st.rerun()
+
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
         "購入チェック",
@@ -1238,7 +1265,7 @@ def render_price_tab():
       with st.container(key="numpad_right_p"):
         if st.button("CE", key="ce_p", use_container_width=True):
           st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun(scope="fragment")
+          st.rerun()
 
         if st.button("→", key="next_p", use_container_width=True):
           if st.session_state.input_buffer_p:
@@ -1257,7 +1284,7 @@ def render_price_tab():
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
             st.session_state.input_buffer_p += num
-            st.rerun(scope="fragment")
+            st.rerun()
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
         st.session_state.input_buffer_p = ""
@@ -1267,7 +1294,7 @@ def render_price_tab():
         st.rerun()
       if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
         st.session_state.input_buffer_p += "0"
-        st.rerun(scope="fragment")
+        st.rerun()
       if cols_bottom[2].button(
           "決定", key="btn_p_enter", use_container_width=True
       ):
@@ -1281,22 +1308,10 @@ def render_price_tab():
         st.rerun()
 
 
-@st.fragment
-def render_weight_and_price_tabs():
-  with tab2:
-    render_weight_tab()
-  with tab3:
-    render_price_tab()
-
-
-render_weight_and_price_tabs()
-
-
 # =========================================================
 # 画面4: セリ結果一覧表示画面
 # =========================================================
-@st.fragment
-def render_results_tab():
+with tab4:
   top_col1, top_col2 = st.columns([3, 1])
   with top_col1:
     st.subheader("📋 セリ結果一覧表示画面")
@@ -1304,9 +1319,8 @@ def render_results_tab():
     if st.button(
         "🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True
     ):
-      st.rerun(scope="fragment")
+      st.rerun()
 
-  # 1. 本日落札した牛一覧
   my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
   st.markdown("#### 🏆 本日落札した牛一覧")
   if my_cows:
@@ -1346,7 +1360,6 @@ def render_results_tab():
 
   st.divider()
 
-  # 2. 本日のセリ結果一覧（全頭）
   st.markdown("#### 📑 本日のセリ結果一覧（全頭）")
   all_rows = []
   for c in st.session_state.cows:
@@ -1377,7 +1390,6 @@ def render_results_tab():
 
   st.divider()
 
-  # 3. kintone送信・確認リセットフロー
   if st.session_state.get("kintone_sent_success"):
     st.success("✅ kintoneにデータを正常に送信しました！")
     st.info("💡 入力値をリセットし、次回のセリの準備をします。")
@@ -1414,10 +1426,6 @@ def render_results_tab():
         success, msg = send_to_kintone(st.session_state.cows)
         if success:
           st.session_state.kintone_sent_success = True
-          st.rerun(scope="fragment")
+          st.rerun()
         else:
           st.error(msg)
-
-
-with tab4:
-  render_results_tab()
