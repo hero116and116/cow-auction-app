@@ -202,7 +202,7 @@ st.markdown(
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
-        margin-bottom: 16px;
+        margin-bottom: 8px; /* 入力欄を下に置くため少しマージンを減らす */
         overflow: hidden;
         background-color: #ffffff;
     }
@@ -288,31 +288,24 @@ st.markdown(
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        gap: 12px;
+        gap: 8px;
         margin-top: 10px;
     }
     .input-display {
-        font-size: 30px;
+        font-size: 32px;
         font-weight: 800;
         color: #1e293b;
         border-bottom: 2px solid #1e293b;
         display: inline-block;
-        min-width: 120px;
+        min-width: 160px;
         height: 40px;
         line-height: 40px;
         padding: 2px 6px;
         text-align: right;
         white-space: nowrap;
         overflow: hidden;
-        transition: all 0.2s ease;
     }
-    /* アクティブな入力欄の強調デザイン */
-    .active-input {
-        border-bottom: 4px solid #f97316 !important;
-        background-color: #fff7ed !important;
-    }
-    
-    .input-unit { font-size: 16px; font-weight: 700; color: #1e293b; margin-left: 2px;}
+    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
     .cow-meta {
         margin-top: 10px;
@@ -504,6 +497,19 @@ st.markdown(
         background-color: #ffffff !important;
         color: #1e293b !important;
         margin-top: 0 !important;
+    }
+    
+    /* 🔴 タップで切り替える入力モードボタンの共通デザイン */
+    .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
+        height: 60px !important;
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        background-color: #f8fafc !important;
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        color: #475569 !important;
+        padding: 4px !important;
+        margin-bottom: 12px !important;
     }
     
     [data-testid="stToolbar"],
@@ -1205,17 +1211,13 @@ with tab3:
 
   calc = calculate_cow_metrics(cow)
 
-  # モードに応じた表示の切り替え（落札額 or 落札者番号）
+  # モードに応じた表示の切り替えと、未入力時のハイフン処理
   if st.session_state.p_mode == "price":
-      display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
-      display_b = str(cow.get("落札者番号", ""))
-      active_price_class = "active-input"
-      active_buyer_class = ""
+      display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-")
+      display_b = str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-"
   else:
-      display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
-      display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else str(cow.get("落札者番号", ""))
-      active_price_class = ""
-      active_buyer_class = "active-input"
+      display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-"
+      display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-")
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1275,6 +1277,7 @@ with tab3:
   )
   unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
+  # HTMLからは入力欄エリアを削除し、上部の情報表示のみにする
   card_html_p = (
       '<div class="screen-card">'
       '<div class="card-top">'
@@ -1295,25 +1298,48 @@ with tab3:
       f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
-      
-      # 新しい落札額・落札者番号の横並び表示エリア
-      '<div class="input-display-row" style="align-items: flex-end;">'
-      '<div style="text-align:center;">'
-      '<div style="font-size:12px; color:#64748b; margin-bottom:2px;">落札額</div>'
-      f'<span class="input-display {active_price_class}">{display_p}</span>'
-      '<span class="input-unit">千円</span>'
-      '</div>'
-      '<div style="width:10px;"></div>'
-      '<div style="text-align:center;">'
-      '<div style="font-size:12px; color:#64748b; margin-bottom:2px;">落札者番号</div>'
-      f'<span class="input-display {active_buyer_class}" style="min-width:100px;">{display_b}</span>'
-      '</div>'
-      '</div>'
       "</div>"
-      '<div class="card-divider"></div>'
       "</div>"
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
+
+  # --- 🔴 アクティブな入力モードを強調する動的CSS ---
+  active_css = f"""
+  <style>
+  .st-key-btn_switch_{st.session_state.p_mode} button {{
+      border: 2px solid #f97316 !important;
+      border-bottom: 4px solid #f97316 !important;
+      background-color: #fff7ed !important;
+      color: #ea580c !important;
+  }}
+  </style>
+  """
+  st.markdown(active_css, unsafe_allow_html=True)
+
+  # --- タップで切り替え可能な新しい入力エリア ---
+  col_p, col_b = st.columns(2)
+  with col_p:
+      if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
+          if st.session_state.p_mode != "price":
+              # 購買者番号モードから戻る際、入力途中のデータがあれば保存
+              if st.session_state.input_buffer_p:
+                  st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+                  save_backup()
+              st.session_state.input_buffer_p = ""
+              st.session_state.p_mode = "price"
+              st.rerun()
+
+  with col_b:
+      if st.button(f"番号: {display_b}", key="btn_switch_buyer", use_container_width=True):
+          if st.session_state.p_mode != "buyer":
+              # 落札額モードから切り替える際、入力途中のデータがあれば保存
+              if st.session_state.input_buffer_p:
+                  st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                  st.session_state.metrics_dirty = True
+                  save_backup()
+              st.session_state.input_buffer_p = ""
+              st.session_state.p_mode = "buyer"
+              st.rerun()
 
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
@@ -1340,7 +1366,7 @@ with tab3:
           save_backup()
         st.session_state.curr_idx_p = max(0, idx - 1)
         st.session_state.input_buffer_p = ""
-        st.session_state.p_mode = "price"
+        st.session_state.p_mode = "price" # 常に落札額入力からスタート
         st.rerun()
 
     with col_r:
@@ -1359,7 +1385,7 @@ with tab3:
             save_backup()
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
           st.session_state.input_buffer_p = ""
-          st.session_state.p_mode = "price"
+          st.session_state.p_mode = "price" # 常に落札額入力からスタート
           st.rerun()
 
     with col_pad:
@@ -1383,7 +1409,6 @@ with tab3:
         st.session_state.input_buffer_p += "0"
         st.rerun()
       
-      # 決定ボタンのロジックをモード別に処理
       if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
         if st.session_state.p_mode == "price":
             if st.session_state.input_buffer_p:
