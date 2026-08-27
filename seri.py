@@ -288,24 +288,31 @@ st.markdown(
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        gap: 8px;
+        gap: 12px;
         margin-top: 10px;
     }
     .input-display {
-        font-size: 32px;
+        font-size: 30px;
         font-weight: 800;
         color: #1e293b;
         border-bottom: 2px solid #1e293b;
         display: inline-block;
-        min-width: 160px;
+        min-width: 120px;
         height: 40px;
         line-height: 40px;
         padding: 2px 6px;
         text-align: right;
         white-space: nowrap;
         overflow: hidden;
+        transition: all 0.2s ease;
     }
-    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
+    /* アクティブな入力欄の強調デザイン */
+    .active-input {
+        border-bottom: 4px solid #f97316 !important;
+        background-color: #fff7ed !important;
+    }
+    
+    .input-unit { font-size: 16px; font-weight: 700; color: #1e293b; margin-left: 2px;}
 
     .cow-meta {
         margin-top: 10px;
@@ -787,6 +794,7 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
   for r in data:
     r["性別"] = clean_gender(r.get("性別", "去"))
     r["個体識別番号"] = str(r.get("個体識別番号", "") or "")
+    r["落札者番号"] = ""
   return data
 
 
@@ -828,6 +836,8 @@ def send_to_kintone(cows_list):
           "予測出荷体重": {"value": calc["予測出荷体重"]},
           "実際落札額": {"value": price},
           "購入結果": {"value": status},
+          # ※ キントーン側に「落札者番号」フィールドを追加した後に、以下の行のコメントアウトを外して有効化してください
+          # "落札者番号": {"value": str(c.get("落札者番号", ""))},
           "設定枝肉単価": {"value": settings["carcass_price"]},
           "設定育成コスト": {"value": settings["daily_cost"]},
           "設定出荷日齢": {"value": settings["shipment_days"]},
@@ -854,6 +864,10 @@ if "cows" not in st.session_state:
     try:
       with open(BACKUP_FILE, "r", encoding="utf-8") as f:
         st.session_state.cows = json.load(f)
+        # 過去データに落札者番号がない場合の補完
+        for c in st.session_state.cows:
+            if "落札者番号" not in c:
+                c["落札者番号"] = ""
       st.toast("前回の作業データを復元しました 📦", icon="✅")
     except Exception:
       st.session_state.cows = [{
@@ -861,6 +875,7 @@ if "cows" not in st.session_state:
           "個体識別番号": "",
           "体重": 0,
           "実際落札額": 0,
+          "落札者番号": "",
           "性別": "去",
           "生年月日": "-",
           "日齢": 280,
@@ -879,6 +894,7 @@ if "cows" not in st.session_state:
         "個体識別番号": "",
         "体重": 0,
         "実際落札額": 0,
+        "落札者番号": "",
         "性別": "去",
         "生年月日": "-",
         "日齢": 280,
@@ -900,6 +916,8 @@ if "input_buffer_w" not in st.session_state:
   st.session_state.input_buffer_w = ""
 if "input_buffer_p" not in st.session_state:
   st.session_state.input_buffer_p = ""
+if "p_mode" not in st.session_state: # 落札入力画面のモード管理 ("price" or "buyer")
+  st.session_state.p_mode = "price"
 if "avg_unit_price_cache" not in st.session_state:
   st.session_state.avg_unit_price_cache = 0
 if "total_unit_price_sum" not in st.session_state:
@@ -956,6 +974,7 @@ with tab1:
           for r in parsed:
             r["体重"] = 0
             r["実際落札額"] = 0
+            r["落札者番号"] = ""
             r["自社落札"] = False
             r["マイナス要素"] = []
           st.session_state.cows = parsed
@@ -964,6 +983,7 @@ with tab1:
           st.session_state.curr_idx_p = 0
           st.session_state.input_buffer_w = ""
           st.session_state.input_buffer_p = ""
+          st.session_state.p_mode = "price"
           st.session_state.just_parsed_count = len(parsed)
           save_backup()
           st.toast("読み取りが完了しました！", icon="✅")
@@ -1002,6 +1022,7 @@ with tab1:
             "個体識別番号": "",
             "体重": float(add_weight),
             "実際落札額": 0,
+            "落札者番号": "",
             "性別": add_gender,
             "生年月日": "-",
             "日齢": int(add_days),
@@ -1179,14 +1200,22 @@ with tab3:
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
+  # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
   avg_unit_price = calculate_average_unit_price()
+
   calc = calculate_cow_metrics(cow)
 
-  display_p = (
-      st.session_state.input_buffer_p
-      if st.session_state.input_buffer_p != ""
-      else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
-  )
+  # モードに応じた表示の切り替え（落札額 or 落札者番号）
+  if st.session_state.p_mode == "price":
+      display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "")
+      display_b = str(cow.get("落札者番号", ""))
+      active_price_class = "active-input"
+      active_buyer_class = ""
+  else:
+      display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else ""
+      display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else str(cow.get("落札者番号", ""))
+      active_price_class = ""
+      active_buyer_class = "active-input"
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1216,12 +1245,15 @@ with tab3:
             None,
         )
         if target_idx is not None:
+          # 移動前に今の状態を保存してモードをリセット
           if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
-            st.session_state.metrics_dirty = True
+            if st.session_state.p_mode == "price":
+                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                st.session_state.metrics_dirty = True
+            else:
+                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
             save_backup()
+          st.session_state.p_mode = "price"
           st.session_state.curr_idx_p = target_idx
           st.session_state.input_buffer_p = ""
           st.rerun()
@@ -1263,10 +1295,20 @@ with tab3:
       f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
       f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
       "</div>"
-      '<div class="input-display-row">'
-      f'<span class="input-display">{display_p}</span>'
+      
+      # 新しい落札額・落札者番号の横並び表示エリア
+      '<div class="input-display-row" style="align-items: flex-end;">'
+      '<div style="text-align:center;">'
+      '<div style="font-size:12px; color:#64748b; margin-bottom:2px;">落札額</div>'
+      f'<span class="input-display {active_price_class}">{display_p}</span>'
       '<span class="input-unit">千円</span>'
-      "</div>"
+      '</div>'
+      '<div style="width:10px;"></div>'
+      '<div style="text-align:center;">'
+      '<div style="font-size:12px; color:#64748b; margin-bottom:2px;">落札者番号</div>'
+      f'<span class="input-display {active_buyer_class}" style="min-width:100px;">{display_b}</span>'
+      '</div>'
+      '</div>'
       "</div>"
       '<div class="card-divider"></div>'
       "</div>"
@@ -1290,13 +1332,15 @@ with tab3:
     with col_l:
       if st.button("←", key="prev_p", use_container_width=True):
         if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
-          st.session_state.metrics_dirty = True
+          if st.session_state.p_mode == "price":
+              st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+              st.session_state.metrics_dirty = True
+          else:
+              st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
           save_backup()
         st.session_state.curr_idx_p = max(0, idx - 1)
         st.session_state.input_buffer_p = ""
+        st.session_state.p_mode = "price"
         st.rerun()
 
     with col_r:
@@ -1307,13 +1351,15 @@ with tab3:
 
         if st.button("→", key="next_p", use_container_width=True):
           if st.session_state.input_buffer_p:
-            st.session_state.cows[idx]["実際落札額"] = int(
-                st.session_state.input_buffer_p
-            )
-            st.session_state.metrics_dirty = True
+            if st.session_state.p_mode == "price":
+                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                st.session_state.metrics_dirty = True
+            else:
+                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
             save_backup()
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
           st.session_state.input_buffer_p = ""
+          st.session_state.p_mode = "price"
           st.rerun()
 
     with col_pad:
@@ -1326,28 +1372,39 @@ with tab3:
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
         st.session_state.input_buffer_p = ""
-        st.session_state.cows[idx]["実際落札額"] = 0
-        st.session_state.metrics_dirty = True
+        if st.session_state.p_mode == "price":
+            st.session_state.cows[idx]["実際落札額"] = 0
+            st.session_state.metrics_dirty = True
+        else:
+            st.session_state.cows[idx]["落札者番号"] = ""
         save_backup()
         st.rerun()
       if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
         st.session_state.input_buffer_p += "0"
         st.rerun()
-      if cols_bottom[2].button(
-          "決定", key="btn_p_enter", use_container_width=True
-      ):
-        if st.session_state.input_buffer_p:
-          st.session_state.cows[idx]["実際落札額"] = int(
-              st.session_state.input_buffer_p
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.input_buffer_p = ""
-        st.rerun()
+      
+      # 決定ボタンのロジックをモード別に処理
+      if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
+        if st.session_state.p_mode == "price":
+            if st.session_state.input_buffer_p:
+                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                st.session_state.metrics_dirty = True
+                save_backup()
+            st.session_state.input_buffer_p = ""
+            st.session_state.p_mode = "buyer" # 決定後、落札者番号モードへ移行
+            st.rerun()
+        else: # buyerモードの場合
+            if st.session_state.input_buffer_p:
+                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+                save_backup()
+            st.session_state.input_buffer_p = ""
+            st.session_state.p_mode = "price" # モードをリセットして次の牛へ
+            st.session_state.curr_idx_p = min(total - 1, idx + 1)
+            st.rerun()
 
 
 # =========================================================
-# 画面4: kg単価推移グラフ画面（500刻み軸 ＆ 平均線つき）
+# 画面4: kg単価推移グラフ画面（正しい番号順 ＆ Y軸1000〜3500固定）
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1358,6 +1415,7 @@ with tab4:
   for c in st.session_state.cows:
     p = c.get("実際落札額", 0)
     w = c.get("体重", 0)
+    # 0円や未入力の牛はグラフからも自動除外
     if p and p > 0 and w and w > 0:
       kp = int(round(p * 1000 / w))
       graph_data.append({
@@ -1407,6 +1465,7 @@ with tab4:
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
+    avg_kp = int(df_g["kg単価(円)"].mean())
     
     col_stat1, col_stat2, col_stat3 = st.columns(3)
     col_stat1.metric("最低 kg単価", f"{min_kp:,} 円")
@@ -1446,6 +1505,7 @@ with tab5:
         "母の母の祖父",
         "摘要",
         "実際落札額",
+        "落札者番号",
     ]]
     df_my.columns = [
         "出場番号",
@@ -1461,6 +1521,7 @@ with tab5:
         "母の母の祖父",
         "摘要",
         "落札額(千円)",
+        "落札者番号",
     ]
     st.dataframe(df_my, use_container_width=True, hide_index=True)
   else:
@@ -1487,6 +1548,7 @@ with tab5:
         "摘要": c.get("摘要", "") or "-",
         "損益分岐点(千円)": m["ボーダー価格"],
         "落札額(千円)": c["実際落札額"],
+        "落札者番号": c.get("落札者番号", ""),
         "購入結果": (
             "自社落札"
             if c.get("自社落札", False)
@@ -1512,6 +1574,7 @@ with tab5:
         new_c = c.copy()
         new_c["体重"] = 0
         new_c["実際落札額"] = 0
+        new_c["落札者番号"] = ""
         new_c["自社落札"] = False
         new_c["マイナス要素"] = []
         clean_cows.append(new_c)
@@ -1523,6 +1586,7 @@ with tab5:
       st.session_state.curr_idx_p = 0
       st.session_state.input_buffer_w = ""
       st.session_state.input_buffer_p = ""
+      st.session_state.p_mode = "price"
       st.session_state.metrics_dirty = True
       st.session_state.kintone_sent_success = False
       st.rerun()
