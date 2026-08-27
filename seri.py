@@ -37,7 +37,7 @@ COW_ICON_B64 = (
     "pODhis+dGgpAa4Vrem7iNT7FK4BYBbgFGLRbuIrw+L5KYFUFkMTrkU9tQ2itsEDo3pv4/rDu"
     "Lz5+/Dh98uRJmFD4T0yTP5KvdzEJifJ32xca7x9pH/5v2pf/XWgIkFdchjiIr8WSxJ/ix8PE"
     "RUawbxtXCh7U8Q7iPQYXZUkIhweZwFh8DqhGuKHI670FQM6QyFYMi8AQFFBhFXDQxt8mU1Es"
-    "wiIExSv7GdY6SwPgbScCYE0ouKIR1gvPhny8/MnDLo1zEguYYJ3hqnsHdCYA4s0S39nPsNaz"
+    "wiIExSv7GdY6SwPgbScCYE0ouKIR1gvPhny8/MnDLo1zEguYYJ3hqnsNaz"
     "LlcASZzpnNnPsNKvnQ6A6Mx+hpVGy9cIdC4A4jLmiX0Nq0Og6xVA4BZnsNpR5wMgPkZpbF/D"
     "dx71oQJQBcBqw14EQDwtqAqgjzY9UXjQiwDIVAEWB9E3VxtCYNSbALA4iB6b5Pmiwx5siLeq"
     "AHroTgB8rQLmqgDMA/S3AlAF0DvpgU8AqAJQBQiAbBUAfTIXAN9WAWNtgh65FQDfsjoQFUBf"
@@ -306,6 +306,12 @@ st.markdown(
         text-align: right;
         white-space: nowrap;
         overflow: hidden;
+    }
+    
+    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
+    .active-input {
+        border-bottom: 4px solid #f97316 !important;
+        background-color: #fff7ed !important;
     }
     
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
@@ -865,8 +871,7 @@ def send_to_kintone(cows_list):
           "予測出荷体重": {"value": calc["予測出荷体重"]},
           "実際落札額": {"value": price},
           "購入結果": {"value": status},
-          # ※ キントーン側に「落札者番号」フィールドを追加した後に、以下の行のコメントアウトを外して有効化してください
-          # "落札者番号": {"value": str(c.get("落札者番号", ""))},
+          "落札者番号": {"value": str(c.get("落札者番号", ""))},
           "設定枝肉単価": {"value": settings["carcass_price"]},
           "設定育成コスト": {"value": settings["daily_cost"]},
           "設定出荷日齢": {"value": settings["shipment_days"]},
@@ -1347,7 +1352,7 @@ with tab3:
   with st.container(key="mode_switch_area"):
       col_p, col_b = st.columns(2)
       with col_p:
-          if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
+          if st.button(f"額: {display_p}", key="btn_switch_price", use_container_width=True):
               if st.session_state.p_mode != "price":
                   # 購買者番号モードから戻る際、入力途中のデータがあれば保存
                   if st.session_state.input_buffer_p:
@@ -1358,7 +1363,7 @@ with tab3:
                   st.rerun()
 
       with col_b:
-          if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
+          if st.button(f"購買: {display_b}", key="btn_switch_buyer", use_container_width=True):
               if st.session_state.p_mode != "buyer":
                   # 落札額モードから切り替える際、入力途中のデータがあれば保存
                   if st.session_state.input_buffer_p:
