@@ -1107,11 +1107,11 @@ with tab1:
       save_backup()
       st.rerun()
 
-
 # =========================================================
-# 画面2: 体重入力画面（下見）
+# 画面2: 体重入力画面（下見） - 部分再描画（Fragment）で高速化
 # =========================================================
-with tab2:
+@st.fragment
+def render_weight_input():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
@@ -1147,7 +1147,6 @@ with tab2:
             save_backup()
           st.session_state.curr_idx_w = target_idx
           st.session_state.input_buffer_w = ""
-          st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
@@ -1206,13 +1205,11 @@ with tab2:
           save_backup()
         st.session_state.curr_idx_w = max(0, idx - 1)
         st.session_state.input_buffer_w = ""
-        st.rerun()
 
     with col_r:
       with st.container(key="numpad_right_w"):
         if st.button("BS", key="ce_w", use_container_width=True):
           st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun()
 
         if st.button("→", key="next_w", use_container_width=True):
           if st.session_state.input_buffer_w:
@@ -1223,7 +1220,6 @@ with tab2:
             save_backup()
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
           st.session_state.input_buffer_w = ""
-          st.rerun()
 
     with col_pad:
       for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
@@ -1231,17 +1227,17 @@ with tab2:
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
             st.session_state.input_buffer_w += num
-            st.rerun()
+            
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
         st.session_state.input_buffer_w = ""
         st.session_state.cows[idx]["体重"] = 0
         st.session_state.metrics_dirty = True
         save_backup()
-        st.rerun()
+        
       if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
         st.session_state.input_buffer_w += "0"
-        st.rerun()
+        
       if cols_bottom[2].button(
           "決定", key="btn_w_enter", use_container_width=True
       ):
@@ -1252,13 +1248,12 @@ with tab2:
           st.session_state.metrics_dirty = True
           save_backup()
         st.session_state.input_buffer_w = ""
-        st.rerun()
-
 
 # =========================================================
-# 画面3: 落札価格入力画面（セリ本番）
+# 画面3: 落札価格入力画面（セリ本番） - 部分再描画（Fragment）で高速化
 # =========================================================
-with tab3:
+@st.fragment
+def render_price_input():
   total = len(st.session_state.cows)
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
@@ -1319,7 +1314,6 @@ with tab3:
           st.session_state.p_mode = "price"
           st.session_state.curr_idx_p = target_idx
           st.session_state.input_buffer_p = ""
-          st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
@@ -1389,7 +1383,6 @@ with tab3:
                       save_backup()
                   st.session_state.input_buffer_p = ""
                   st.session_state.p_mode = "price"
-                  st.rerun()
 
       with col_b:
           if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
@@ -1401,7 +1394,6 @@ with tab3:
                       save_backup()
                   st.session_state.input_buffer_p = ""
                   st.session_state.p_mode = "buyer"
-                  st.rerun()
 
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
@@ -1429,13 +1421,11 @@ with tab3:
         st.session_state.curr_idx_p = max(0, idx - 1)
         st.session_state.input_buffer_p = ""
         st.session_state.p_mode = "price" # 常に落札額入力からスタート
-        st.rerun()
 
     with col_r:
       with st.container(key="numpad_right_p"):
         if st.button("BS", key="ce_p", use_container_width=True):
           st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun()
 
         if st.button("→", key="next_p", use_container_width=True):
           if st.session_state.input_buffer_p:
@@ -1448,7 +1438,6 @@ with tab3:
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
           st.session_state.input_buffer_p = ""
           st.session_state.p_mode = "price" # 常に落札額入力からスタート
-          st.rerun()
 
     with col_pad:
       for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
@@ -1456,7 +1445,7 @@ with tab3:
         for i, num in enumerate(row_nums):
           if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
             st.session_state.input_buffer_p += num
-            st.rerun()
+            
       cols_bottom = st.columns(3)
       if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
         st.session_state.input_buffer_p = ""
@@ -1466,11 +1455,10 @@ with tab3:
         else:
             st.session_state.cows[idx]["落札者番号"] = ""
         save_backup()
-        st.rerun()
+        
       if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
         st.session_state.input_buffer_p += "0"
-        st.rerun()
-      
+        
       if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
         if st.session_state.p_mode == "price":
             if st.session_state.input_buffer_p:
@@ -1479,15 +1467,21 @@ with tab3:
                 save_backup()
             st.session_state.input_buffer_p = ""
             st.session_state.p_mode = "buyer" # 決定後、落札者番号モードへ移行
-            st.rerun()
         else: # buyerモードの場合
             if st.session_state.input_buffer_p:
                 st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
                 save_backup()
             st.session_state.input_buffer_p = ""
             st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
-            st.rerun()
 
+# ---------------------------------------------------------
+# 各タブの呼び出し
+# ---------------------------------------------------------
+with tab2:
+  render_weight_input()
+
+with tab3:
+  render_price_input()
 
 # =========================================================
 # 画面4: kg単価推移グラフ画面（正しい番号順 ＆ Y軸1000〜3500固定）
