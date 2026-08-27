@@ -177,7 +177,7 @@ def clear_backup():
       pass
 
 
-# --- カスタムCSS (体重入力画面は一切変更なしの元の状態に戻しました) ---
+# --- カスタムCSS ---
 st.markdown(
     """
 <style>
@@ -506,17 +506,27 @@ st.markdown(
         margin-top: 0 !important;
     }
     
-    /* 🔴 タップで切り替える入力モードボタンの共通デザイン */
+    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定 */
+    .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+    .st-key-mode_switch_area div[data-testid="stColumn"],
+    .st-key-mode_switch_area div[data-testid="column"] {
+        width: 50% !important;
+        min-width: 0 !important;
+    }
     .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
-        height: 60px !important;
-        font-size: 22px !important;
+        height: 54px !important;
+        font-size: 18px !important;
         font-weight: 800 !important;
         background-color: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
         border-radius: 8px !important;
         color: #475569 !important;
         padding: 4px !important;
-        margin-bottom: 12px !important;
+        margin-bottom: 8px !important;
     }
     
     [data-testid="stToolbar"],
@@ -1328,29 +1338,30 @@ with tab3:
   st.markdown(active_css, unsafe_allow_html=True)
 
   # --- タップで切り替え可能な新しい入力エリア ---
-  col_p, col_b = st.columns(2)
-  with col_p:
-      if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
-          if st.session_state.p_mode != "price":
-              # 購買者番号モードから戻る際、入力途中のデータがあれば保存
-              if st.session_state.input_buffer_p:
-                  st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-                  save_backup()
-              st.session_state.input_buffer_p = ""
-              st.session_state.p_mode = "price"
-              st.rerun()
+  with st.container(key="mode_switch_area"):
+      col_p, col_b = st.columns(2)
+      with col_p:
+          if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
+              if st.session_state.p_mode != "price":
+                  # 購買者番号モードから戻る際、入力途中のデータがあれば保存
+                  if st.session_state.input_buffer_p:
+                      st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+                      save_backup()
+                  st.session_state.input_buffer_p = ""
+                  st.session_state.p_mode = "price"
+                  st.rerun()
 
-  with col_b:
-      if st.button(f"番号: {display_b}", key="btn_switch_buyer", use_container_width=True):
-          if st.session_state.p_mode != "buyer":
-              # 落札額モードから切り替える際、入力途中のデータがあれば保存
-              if st.session_state.input_buffer_p:
-                  st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                  st.session_state.metrics_dirty = True
-                  save_backup()
-              st.session_state.input_buffer_p = ""
-              st.session_state.p_mode = "buyer"
-              st.rerun()
+      with col_b:
+          if st.button(f"番号: {display_b}", key="btn_switch_buyer", use_container_width=True):
+              if st.session_state.p_mode != "buyer":
+                  # 落札額モードから切り替える際、入力途中のデータがあれば保存
+                  if st.session_state.input_buffer_p:
+                      st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                      st.session_state.metrics_dirty = True
+                      save_backup()
+                  st.session_state.input_buffer_p = ""
+                  st.session_state.p_mode = "buyer"
+                  st.rerun()
 
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
@@ -1435,7 +1446,6 @@ with tab3:
                 save_backup()
             st.session_state.input_buffer_p = ""
             st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
-            # 次の牛へ移動するコード（st.session_state.curr_idx_p = ...）を削除しました
             st.rerun()
 
 
