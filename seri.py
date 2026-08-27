@@ -517,16 +517,22 @@ st.markdown(
         width: 50% !important;
         min-width: 0 !important;
     }
+    /* ボタンの枠のサイズ設定 */
     .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
-        height: 54px !important;
-        font-size: 18px !important;
-        font-weight: 800 !important;
+        height: 70px !important; /* 文字に合わせて枠も少し大きくしました */
         background-color: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
         border-radius: 8px !important;
         color: #475569 !important;
         padding: 4px !important;
         margin-bottom: 8px !important;
+    }
+    
+    /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
+    .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
+        font-size: 48px !important;  /* ここで文字の大きさを変えられます */
+        font-weight: 900 !important;
+        margin: 0 !important;
     }
     
     [data-testid="stToolbar"],
