@@ -1434,8 +1434,8 @@ with tab3:
                 st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
                 save_backup()
             st.session_state.input_buffer_p = ""
-            st.session_state.p_mode = "price" # モードをリセットして次の牛へ
-            st.session_state.curr_idx_p = min(total - 1, idx + 1)
+            st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
+            # 次の牛へ移動するコード（st.session_state.curr_idx_p = ...）を削除しました
             st.rerun()
 
 
