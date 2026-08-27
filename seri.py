@@ -509,7 +509,7 @@ st.markdown(
     }
     
     /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
-    /* 👇 マイナスマージンを調整し、文字1つ分（約20px）下に下げました */
+    /* 👇 マイナスマージンを調整した*/
     .st-key-mode_switch_area {
         margin-top: -26px !important; 
     }
@@ -536,7 +536,7 @@ st.markdown(
     
     /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
     .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
-        font-size: 30px !important;  /* ここで文字の大きさを変えられます */
+        font-size: 24px !important;  /* ここで文字の大きさを変えられます */
         font-weight: 900 !important;
         margin: 0 !important;
     }
