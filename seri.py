@@ -177,7 +177,7 @@ def clear_backup():
       pass
 
 
-# --- カスタムCSS ---
+# --- カスタムCSS (体重入力画面は一切変更なしの元の状態に戻しました) ---
 st.markdown(
     """
 <style>
@@ -202,7 +202,7 @@ st.markdown(
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
-        margin-bottom: 8px; /* 入力欄を下に置くため少しマージンを減らす */
+        margin-bottom: 16px;
         overflow: hidden;
         background-color: #ffffff;
     }
@@ -305,6 +305,13 @@ st.markdown(
         white-space: nowrap;
         overflow: hidden;
     }
+    
+    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
+    .active-input {
+        border-bottom: 4px solid #f97316 !important;
+        background-color: #fff7ed !important;
+    }
+    
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
     .cow-meta {
@@ -1215,9 +1222,13 @@ with tab3:
   if st.session_state.p_mode == "price":
       display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-")
       display_b = str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-"
+      active_price_class = "active-input"
+      active_buyer_class = ""
   else:
       display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-"
       display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-")
+      active_price_class = ""
+      active_buyer_class = "active-input"
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1277,9 +1288,9 @@ with tab3:
   )
   unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
-  # HTMLからは入力欄エリアを削除し、上部の情報表示のみにする
+  # 画面3ではHTMLから直接的な入力欄出力を省き、Streamlitのボタンで疑似的に入力欄を描画する
   card_html_p = (
-      '<div class="screen-card">'
+      '<div class="screen-card" style="margin-bottom: 8px;">'
       '<div class="card-top">'
       '<div class="cow-top-row">'
       '<div class="cow-info-col cow-meta">'
@@ -1303,7 +1314,7 @@ with tab3:
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
 
-  # --- 🔴 アクティブな入力モードを強調する動的CSS ---
+  # --- 🔴 画面3専用：アクティブな入力モードを強調する動的CSS ---
   active_css = f"""
   <style>
   .st-key-btn_switch_{st.session_state.p_mode} button {{
