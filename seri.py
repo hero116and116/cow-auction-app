@@ -1358,7 +1358,7 @@ with tab3:
                   st.rerun()
 
       with col_b:
-          if st.button(f"番号: {display_b}", key="btn_switch_buyer", use_container_width=True):
+          if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
               if st.session_state.p_mode != "buyer":
                   # 落札額モードから切り替える際、入力途中のデータがあれば保存
                   if st.session_state.input_buffer_p:
