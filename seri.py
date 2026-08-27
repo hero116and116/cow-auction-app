@@ -202,7 +202,7 @@ st.markdown(
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
-        margin-bottom: 16px;
+        margin-bottom: 0px !important; /* 隙間を完全に無くすため0に変更 */
         overflow: hidden;
         background-color: #ffffff;
     }
@@ -304,12 +304,6 @@ st.markdown(
         text-align: right;
         white-space: nowrap;
         overflow: hidden;
-    }
-    
-    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
-    .active-input {
-        border-bottom: 4px solid #f97316 !important;
-        background-color: #fff7ed !important;
     }
     
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
@@ -506,7 +500,10 @@ st.markdown(
         margin-top: 0 !important;
     }
     
-    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定 */
+    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
+    .st-key-mode_switch_area {
+        margin-top: -24px !important; /* Streamlitのデフォルトの隙間をマイナスマージンで打ち消す */
+    }
     .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
@@ -1300,7 +1297,7 @@ with tab3:
 
   # 画面3ではHTMLから直接的な入力欄出力を省き、Streamlitのボタンで疑似的に入力欄を描画する
   card_html_p = (
-      '<div class="screen-card" style="margin-bottom: 8px;">'
+      '<div class="screen-card">'
       '<div class="card-top">'
       '<div class="cow-top-row">'
       '<div class="cow-info-col cow-meta">'
