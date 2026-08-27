@@ -505,7 +505,7 @@ st.markdown(
     /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
     /* 👇 マイナスマージンを調整し、文字1つ分（約20px）下に下げました */
     .st-key-mode_switch_area {
-        margin-top: -20px !important; 
+        margin-top: -24px !important; 
     }
     .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
