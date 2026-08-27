@@ -616,10 +616,8 @@ st.markdown(
     }
 
     .st-key-purchase_check_area_p {
-        border: 2px solid #1e293b;
-        border-top: none;
-        margin-top: -16px;
-        padding: 8px 14px;
+        margin: 8px 0 0;
+        padding: 0 8px;
         background-color: #ffffff;
     }
     .st-key-purchase_check_area_p div[data-testid="stCheckbox"] {
@@ -1376,7 +1374,8 @@ with tab2:
   res_w = custom_numpad(
       key=f"numpad_w_{idx}_{st.session_state.reset_ver}",
       data={"mode": "weight", "render_key": f"w_{idx}_{st.session_state.reset_ver}", "weight_val": str(cow["体重"]).replace(".0", "") if cow["体重"] > 0 else "", "price_val": "", "buyer_val": ""},
-      height=340,
+      # 体重用も価格用と同じ余裕のある高さにし、コンポーネント内スクロールをなくす。
+      height=415,
       on_submit_change=lambda: None,
   )
   
@@ -1476,6 +1475,18 @@ with tab3:
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
 
+  # 額・購入Noの選択欄の直前に表示する。
+  with st.container(key="purchase_check_area_p"):
+    purchased = st.checkbox(
+        "購入チェック",
+        value=cow["自社落札"],
+        key=f"buy_check_{st.session_state.reset_ver}_{idx}",
+    )
+    if purchased != cow["自社落札"]:
+      st.session_state.cows[idx]["自社落札"] = purchased
+      st.session_state.metrics_dirty = True
+      save_backup()
+
   # --- JavaScriptテンキーの呼び出し ---
   res_p = custom_numpad(
       key=f"numpad_p_{idx}_{st.session_state.reset_ver}",
@@ -1505,17 +1516,6 @@ with tab3:
       elif action == "enter":
           st.rerun() 
 
-  with st.container(key="purchase_check_area_p"):
-    purchased = st.checkbox(
-        "購入チェック",
-        value=cow["自社落札"],
-        key=f"buy_check_{st.session_state.reset_ver}_{idx}",
-    )
-    if purchased != cow["自社落札"]:
-      st.session_state.cows[idx]["自社落札"] = purchased
-      st.session_state.metrics_dirty = True
-      save_backup()
-
 # =========================================================
 # 画面4: kg単価推移グラフ画面
 # =========================================================
@@ -1526,41 +1526,27 @@ with tab4:
 
   graph_data = []
   for c in st.session_state.cows:
-    p = c.get("実際落札額", 0)
-    w = c.get("体重", 0)
-    if p and p > 0 and w and w > 0:
-      kp = int(round(p * 1000 / w))
+    try:
+      price = float(c.get("実際落札額", 0) or 0)
+      weight = float(c.get("体重", 0) or 0)
+      no = int(c.get("No"))
+    except (TypeError, ValueError):
+      continue
+    if price > 0 and weight > 0:
       graph_data.append({
-          "No": int(c['No']),
-          "出場番号": f"No.{c['No']}",
-          "kg単価(円)": kp,
-          "raw_no": c["No"]
+          "No": no,
+          "出場番号": f"No.{no}",
+          "kg単価(円)": int(round(price * 1000 / weight)),
       })
 
   if graph_data:
-    df_g = pd.DataFrame(graph_data).sort_values("raw_no")
-    import altair as alt
-    avg_kp = int(round(df_g["kg単価(円)"].mean()))
-
-    line_chart = alt.Chart(df_g).mark_line(point=True).encode(
-        x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
-        y=alt.Y(
-            'kg単価(円):Q', 
-            scale=alt.Scale(domain=[1000, 3500], zero=False), 
-            axis=alt.Axis(
-                values=[1000, 1500, 2000, 2500, 3000, 3500],
-                tickCount=6,
-                grid=True
-            ), 
-            title='kg単価 (円)'
-        )
+    df_g = pd.DataFrame(graph_data).sort_values("No")
+    # 固定の縦軸範囲をやめ、入力済みデータに合わせて必ず描画する。
+    st.line_chart(
+        df_g.set_index("出場番号")[["kg単価(円)"]],
+        height=300,
+        use_container_width=True,
     )
-    rule_chart = alt.Chart(pd.DataFrame({'y': [avg_kp]})).mark_rule(
-        color='#059669', strokeDash=[5, 5], strokeWidth=2
-    ).encode(y='y:Q')
-    
-    chart = alt.layer(line_chart, rule_chart).properties(height=300)
-    st.altair_chart(chart, use_container_width=True)
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
