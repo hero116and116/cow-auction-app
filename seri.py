@@ -536,7 +536,7 @@ st.markdown(
     
     /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
     .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
-        font-size: 28px !important;  /* ここで文字の大きさを変えられます */
+        font-size: 30px !important;  /* ここで文字の大きさを変えられます */
         font-weight: 900 !important;
         margin: 0 !important;
     }
