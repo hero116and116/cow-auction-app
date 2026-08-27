@@ -275,20 +275,12 @@ COMPONENT_HTML = """
 </html>
 """
 
-# Streamlitの裏側にコンポーネントを準備
-# @st.cache_resource でアプリプロセス起動後の最初の1回だけ実行する。
-# 複数人が同時に操作した際に、ファイル書き込みとコンポーネント読み込みが
-# 競合してエラーになるのを防ぐ。
-@st.cache_resource
-def _setup_numpad_component():
-    comp_dir = os.path.join(os.getcwd(), "numpad_comp")
-    os.makedirs(comp_dir, exist_ok=True)
-    comp_file = os.path.join(comp_dir, "index.html")
-    with open(comp_file, "w", encoding="utf-8") as f:
-        f.write(COMPONENT_HTML)
-    return components.declare_component("custom_numpad", path=comp_dir)
-
-custom_numpad = _setup_numpad_component()
+# コンポーネント資産はデプロイ済みの固定ファイルを直接配信する。
+# cwd は Streamlit Cloud / コンテナの起動方法で変わるため使わない。
+# 実行時に HTML を生成すると、プロキシが component URL を解決できず
+# 「having trouble loading ... component」になることがある。
+COMPONENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "numpad_comp")
+custom_numpad = components.declare_component("custom_numpad", path=COMPONENT_DIR)
 
 
 st.set_page_config(

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <style>
+    body { margin: 0; padding: 4px 0 0; font-family: sans-serif; background: transparent; user-select: none; -webkit-user-select: none; }
+    .row { display: flex; gap: 6px; margin-bottom: 6px; }
+    button { flex: 1; height: 72px; padding: 0; color: #1e293b; font-size: 28px; font-weight: 700; cursor: pointer; touch-action: manipulation; background: #fff; border: 1px solid #94a3b8; border-radius: 4px; }
+    button:active { color: #3b82f6; background: #f1f5f9; border-color: #3b82f6; }
+    .btn-enter { color: #fff; background: #3b82f6; border-color: #3b82f6; }
+    .btn-c { color: #dc2626; background: #f1f5f9; }
+    .btn-ce { width: 100%; height: 72px; margin-bottom: 6px; color: #c2410c; font-size: 16px; background: #fff7ed; }
+    .btn-nav { width: 100%; font-size: 22px; }
+    .btn-next { height: 228px; }
+    .btn-prev { height: 306px; }
+    .display-row { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 4px 0 12px; }
+    .input-display { display: inline-block; min-width: 160px; height: 40px; overflow: hidden; color: #1e293b; font-size: 32px; font-weight: 800; line-height: 40px; text-align: right; white-space: nowrap; border-bottom: 2px solid #1e293b; }
+    .input-unit { padding-bottom: 2px; color: #1e293b; font-size: 18px; font-weight: 700; }
+    .mode-switch { display: flex; gap: 6px; margin: 4px 0 12px; }
+    .mode-btn { height: 70px; margin-bottom: 0; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }
+    .mode-btn.active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    (() => {
+      const renderEvent = "streamlit:render";
+      const events = new EventTarget();
+      let lastHeight = null;
+      window.Streamlit = {
+        RENDER_EVENT: renderEvent,
+        events,
+        setComponentValue(value) {
+          window.parent.postMessage({ type: "streamlit:setComponentValue", value, dataType: "json" }, "*");
+        },
+        setFrameHeight(height) {
+          if (height === lastHeight) return;
+          lastHeight = height;
+          window.parent.postMessage({ type: "streamlit:setFrameHeight", height }, "*");
+        },
+        setComponentReady() {
+          window.parent.postMessage({ type: "streamlit:componentReady", apiVersion: 1 }, "*");
+        },
+      };
+      window.addEventListener("message", (event) => {
+        if (event.data?.type === renderEvent) events.dispatchEvent(new CustomEvent(renderEvent, { detail: event.data }));
+      });
+
+      let renderKey = "", mode = "", weightBuf = "", priceBuf = "", buyerBuf = "", activeInput = "price";
+      const sendData = (action) => Streamlit.setComponentValue({ action, weight: weightBuf, price: priceBuf, buyer: buyerBuf });
+      const activeBuffer = () => mode === "weight" ? "weight" : activeInput === "price" ? "price" : "buyer";
+      function appendNum(n) { const key = activeBuffer(); if (key === "weight") weightBuf += n; else if (key === "price") priceBuf += n; else buyerBuf += n; renderUI(); }
+      function clearBuf() { const key = activeBuffer(); if (key === "weight") weightBuf = ""; else if (key === "price") priceBuf = ""; else buyerBuf = ""; renderUI(); }
+      function backspace() { const key = activeBuffer(); if (key === "weight") weightBuf = weightBuf.slice(0, -1); else if (key === "price") priceBuf = priceBuf.slice(0, -1); else buyerBuf = buyerBuf.slice(0, -1); renderUI(); }
+      function handleEnter() { if (mode === "price" && activeInput === "price") { activeInput = "buyer"; renderUI(); } else sendData("enter"); }
+      function renderUI() {
+        const display = mode === "weight"
+          ? `<div class="display-row"><span class="input-display">${weightBuf}</span><span class="input-unit">kg</span></div>`
+          : `<div class="mode-switch"><button class="mode-btn ${activeInput === "price" ? "active" : ""}" onclick="activeInput='price';renderUI()">額: ${priceBuf || "-"} 千円</button><button class="mode-btn ${activeInput === "buyer" ? "active" : ""}" onclick="activeInput='buyer';renderUI()">購買No: ${buyerBuf || "-"}</button></div>`;
+        document.getElementById("app").innerHTML = `${display}<div style="display:flex;gap:6px"><div style="flex:.8"><button class="btn-nav btn-prev" onclick="sendData('prev')">←</button></div><div style="flex:4.6"><div class="row"><button onclick="appendNum('7')">7</button><button onclick="appendNum('8')">8</button><button onclick="appendNum('9')">9</button></div><div class="row"><button onclick="appendNum('4')">4</button><button onclick="appendNum('5')">5</button><button onclick="appendNum('6')">6</button></div><div class="row"><button onclick="appendNum('1')">1</button><button onclick="appendNum('2')">2</button><button onclick="appendNum('3')">3</button></div><div class="row" style="margin-bottom:0"><button class="btn-c" onclick="clearBuf()">C</button><button onclick="appendNum('0')">0</button><button class="btn-enter" onclick="handleEnter()">決定</button></div></div><div style="flex:.8;display:flex;flex-direction:column"><button class="btn-ce" onclick="backspace()">BS</button><button class="btn-nav btn-next" onclick="sendData('next')">→</button></div></div>`;
+        Streamlit.setFrameHeight(document.documentElement.scrollHeight + 5);
+      }
+      function onRender(event) {
+        const args = event.detail.args;
+        if (renderKey !== args.render_key) { ({ render_key: renderKey, mode, weight_val: weightBuf, price_val: priceBuf, buyer_val: buyerBuf } = args); activeInput = "price"; }
+        renderUI();
+      }
+      Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+      Streamlit.setComponentReady();
+      Object.assign(window, { appendNum, clearBuf, backspace, handleEnter, renderUI, sendData });
+    })();
+  </script>
+</body>
+</html>
