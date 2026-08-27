@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit.components.v1 import html as st_html
 
 # --- 牛のピクトグラム画像（Base64形式） ---
@@ -74,6 +75,167 @@ COW_ICON_B64 = (
     "tXdJ/nP6k/T18y7aizmA+sZ32Vf2qD9Nd+TMViLOHYXq8adk9QRyaC9XZW/+AQAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOT1fwEGADRsF694441vAAAAAElFTkSuQmCC"
 )
+
+# --- 🚀 究極の高速化：JavaScriptテンキーの生成（内部でHTMLファイルを作成） ---
+COMPONENT_HTML = """
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    body { margin: 0; padding: 4px 0 0 0; font-family: sans-serif; background: transparent; user-select: none; -webkit-user-select: none; }
+    .row { display: flex; gap: 6px; margin-bottom: 6px; }
+    button {
+        flex: 1; height: 72px; font-size: 28px; font-weight: 700;
+        border-radius: 4px; border: 1px solid #94a3b8; background-color: #ffffff;
+        color: #1e293b; cursor: pointer; padding: 0; touch-action: manipulation;
+    }
+    button:active { border-color: #3b82f6; color: #3b82f6; background-color: #f1f5f9; }
+    .btn-enter { background-color: #3b82f6; color: #ffffff; border-color: #3b82f6; }
+    .btn-c { background-color: #f1f5f9; color: #dc2626; }
+    .btn-ce { height: 72px; font-size: 16px; background-color: #fff7ed; color: #c2410c; margin-bottom: 6px; width: 100%;}
+    .btn-nav { font-size: 22px; width: 100%; }
+    .btn-next { height: 228px; }
+    .btn-prev { height: 306px; }
+
+    .display-row { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin-bottom: 12px; margin-top: 4px;}
+    .input-display {
+        font-size: 32px; font-weight: 800; color: #1e293b;
+        border-bottom: 2px solid #1e293b; display: inline-block;
+        min-width: 160px; height: 40px; line-height: 40px;
+        text-align: right; overflow: hidden; white-space: nowrap;
+    }
+    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; padding-bottom: 2px;}
+
+    .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; margin-top: 4px; }
+    .mode-btn {
+        flex: 1; height: 70px; border-radius: 8px; font-size: 24px; font-weight: 900;
+        color: #475569; background: #f8fafc; border: 2px solid #e2e8f0; margin-bottom: 0;
+    }
+    .mode-btn.active {
+        border-color: #f97316; border-bottom: 4px solid #f97316; background-color: #fff7ed; color: #ea580c;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.3.0/dist/streamlit.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    let renderKey = "";
+    let mode = "";
+    let cowNo = -1;
+    let weightBuf = "";
+    let priceBuf = "";
+    let buyerBuf = "";
+    let activeInput = "price";
+
+    function sendData(action) {
+      Streamlit.setComponentValue({
+        action: action,
+        weight: weightBuf,
+        price: priceBuf,
+        buyer: buyerBuf
+      });
+    }
+
+    function appendNum(n) {
+      if (mode === "weight") weightBuf += n;
+      else if (activeInput === "price") priceBuf += n;
+      else buyerBuf += n;
+      renderUI();
+    }
+
+    function clearBuf() {
+      if (mode === "weight") weightBuf = "";
+      else if (activeInput === "price") priceBuf = "";
+      else buyerBuf = "";
+      renderUI();
+    }
+
+    function backspace() {
+      if (mode === "weight") weightBuf = weightBuf.slice(0, -1);
+      else if (activeInput === "price") priceBuf = priceBuf.slice(0, -1);
+      else buyerBuf = buyerBuf.slice(0, -1);
+      renderUI();
+    }
+
+    function handleEnter() {
+      if (mode === "price" && activeInput === "price") {
+        activeInput = "buyer"; // 額で決定を押したら、即座に購買No入力に切り替える（ノーラグ）
+        renderUI();
+      } else {
+        sendData("enter"); // それ以外はPythonにデータを送信して保存
+      }
+    }
+
+    function renderUI() {
+      const app = document.getElementById("app");
+      let html = "";
+
+      if (mode === "weight") {
+        const displayW = weightBuf !== "" ? weightBuf : "";
+        html += `<div class="display-row"><span class="input-display">${displayW}</span><span class="input-unit">kg</span></div>`;
+      } else {
+        const displayP = priceBuf !== "" ? priceBuf : "-";
+        const displayB = buyerBuf !== "" ? buyerBuf : "-";
+        html += `
+          <div class="mode-switch">
+            <button class="mode-btn ${activeInput==='price' ? 'active':''}" onclick="activeInput='price'; renderUI()">額: ${displayP} 千円</button>
+            <button class="mode-btn ${activeInput==='buyer' ? 'active':''}" onclick="activeInput='buyer'; renderUI()">購買No: ${displayB}</button>
+          </div>`;
+      }
+
+      html += `
+        <div style="display: flex; gap: 6px;">
+          <div style="flex: 0.8;">
+            <button class="btn-nav btn-prev" onclick="sendData('prev')">←</button>
+          </div>
+          <div style="flex: 4.6;">
+            <div class="row"><button onclick="appendNum('7')">7</button><button onclick="appendNum('8')">8</button><button onclick="appendNum('9')">9</button></div>
+            <div class="row"><button onclick="appendNum('4')">4</button><button onclick="appendNum('5')">5</button><button onclick="appendNum('6')">6</button></div>
+            <div class="row"><button onclick="appendNum('1')">1</button><button onclick="appendNum('2')">2</button><button onclick="appendNum('3')">3</button></div>
+            <div class="row" style="margin-bottom:0;"><button class="btn-c" onclick="clearBuf()">C</button><button onclick="appendNum('0')">0</button><button class="btn-enter" onclick="handleEnter()">決定</button></div>
+          </div>
+          <div style="flex: 0.8; display: flex; flex-direction: column;">
+            <button class="btn-ce" onclick="backspace()">BS</button>
+            <button class="btn-nav btn-next" onclick="sendData('next')">→</button>
+          </div>
+        </div>
+      `;
+      app.innerHTML = html;
+      Streamlit.setFrameHeight(document.documentElement.scrollHeight + 5);
+    }
+
+    function onRender(event) {
+      const args = event.detail.args;
+      // Python側から「新しい牛になった」合図が来たらバッファをリセット
+      if (renderKey !== args.render_key) {
+        renderKey = args.render_key;
+        mode = args.mode;
+        cowNo = args.cow_no;
+        weightBuf = args.weight_val;
+        priceBuf = args.price_val;
+        buyerBuf = args.buyer_val;
+        activeInput = "price";
+      }
+      renderUI();
+    }
+
+    Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+    Streamlit.setComponentReady();
+  </script>
+</body>
+</html>
+"""
+
+# Streamlitの裏側にコンポーネントを準備
+if not os.path.exists("numpad_comp"):
+    os.makedirs("numpad_comp")
+with open("numpad_comp/index.html", "w", encoding="utf-8") as f:
+    f.write(COMPONENT_HTML)
+custom_numpad = components.declare_component("custom_numpad", path="numpad_comp")
+
 
 st.set_page_config(
     page_title="かう(セリのボーダー計算、結果保存アプリ)",
@@ -199,7 +361,6 @@ st.markdown(
         white-space: nowrap !important;
     }
 
-    /* 👇元の16pxに完全に戻しました（画面2への影響をなくすため） */
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
@@ -285,36 +446,6 @@ st.markdown(
         align-items: flex-end;
         gap: 3px;
     }
-
-    .input-display-row {
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 10px;
-    }
-    .input-display {
-        font-size: 32px;
-        font-weight: 800;
-        color: #1e293b;
-        border-bottom: 2px solid #1e293b;
-        display: inline-block;
-        min-width: 160px;
-        height: 40px;
-        line-height: 40px;
-        padding: 2px 6px;
-        text-align: right;
-        white-space: nowrap;
-        overflow: hidden;
-    }
-    
-    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
-    .active-input {
-        border-bottom: 4px solid #f97316 !important;
-        background-color: #fff7ed !important;
-    }
-    
-    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
     .cow-meta {
         margin-top: 10px;
@@ -410,137 +541,6 @@ st.markdown(
         white-space: nowrap !important;
     }
 
-    .st-key-numpad_area_w, .st-key-numpad_area_p {
-        border: 2px solid #1e293b;
-        border-top: none;
-        border-radius: 0 0 4px 4px;
-        margin-top: -16px;
-        padding: 12px 6px 16px 6px;
-        background-color: #ffffff;
-    }
-
-    .st-key-numpad_area_w div[data-testid="stHorizontalBlock"],
-    .st-key-numpad_area_p div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 6px !important;
-    }
-    .st-key-numpad_area_w div[data-testid="stColumn"],
-    .st-key-numpad_area_p div[data-testid="stColumn"],
-    .st-key-numpad_area_w div[data-testid="column"],
-    .st-key-numpad_area_p div[data-testid="column"] {
-        width: auto !important;
-        min-width: 0 !important;
-    }
-    .st-key-numpad_area_w button,
-    .st-key-numpad_area_p button {
-        height: 72px !important;
-        font-size: 28px !important;
-        font-weight: 700 !important;
-        border-radius: 4px !important;
-        border: 1px solid #94a3b8 !important;
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-        padding: 0 !important;
-    }
-    .st-key-numpad_area_w button:hover,
-    .st-key-numpad_area_p button:hover { border-color: #3b82f6 !important; color: #3b82f6 !important; }
-    .st-key-numpad_area_w button:focus,
-    .st-key-numpad_area_p button:focus,
-    .st-key-numpad_area_w button:focus-visible,
-    .st-key-numpad_area_p button:focus-visible {
-        outline: none !important;
-        box-shadow: none !important;
-    }
-
-    .st-key-btn_w_enter button, .st-key-btn_p_enter button {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-        border-color: #3b82f6 !important;
-    }
-    .st-key-btn_w_c button, .st-key-btn_p_c button {
-        background-color: #f1f5f9 !important;
-        color: #dc2626 !important;
-    }
-
-    .st-key-numpad_area_w div[data-testid="element-container"],
-    .st-key-numpad_area_p div[data-testid="element-container"] {
-        margin: 0 !important;
-    }
-    .st-key-numpad_area_w div[data-testid="element-container"]:not(:last-child),
-    .st-key-numpad_area_p div[data-testid="element-container"]:not(:last-child) {
-        margin-bottom: 6px !important;
-    }
-
-    .st-key-prev_w button, .st-key-prev_p button {
-        height: 306px !important;
-        font-size: 22px !important;
-        font-weight: 700 !important;
-        border-radius: 4px !important;
-        border: 1px solid #94a3b8 !important;
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-        margin-top: 0 !important;
-    }
-
-    .st-key-ce_w button, .st-key-ce_p button {
-        height: 72px !important;
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        border-radius: 4px !important;
-        border: 1px solid #94a3b8 !important;
-        background-color: #fff7ed !important;
-        color: #c2410c !important;
-        padding: 0 !important;
-    }
-    .st-key-ce_w button:hover, .st-key-ce_p button:hover {
-        border-color: #3b82f6 !important;
-        color: #3b82f6 !important;
-    }
-    .st-key-next_w button, .st-key-next_p button {
-        height: 228px !important;
-        font-size: 22px !important;
-        font-weight: 700 !important;
-        border-radius: 4px !important;
-        border: 1px solid #94a3b8 !important;
-        background-color: #ffffff !important;
-        color: #1e293b !important;
-        margin-top: 0 !important;
-    }
-    
-    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
-    /* 👇 マイナスマージンを調整した*/
-    .st-key-mode_switch_area {
-        margin-top: -26px !important; 
-    }
-    .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 6px !important;
-    }
-    .st-key-mode_switch_area div[data-testid="stColumn"],
-    .st-key-mode_switch_area div[data-testid="column"] {
-        width: 50% !important;
-        min-width: 0 !important;
-    }
-    /* ボタンの枠のサイズ設定 */
-    .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
-        height: 70px !important; /* 文字に合わせて枠も少し大きくしました */
-        background-color: #f8fafc !important;
-        border: 2px solid #e2e8f0 !important;
-        border-radius: 8px !important;
-        color: #475569 !important;
-        padding: 4px !important;
-        margin-bottom: 8px !important;
-    }
-    
-    /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
-    .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
-        font-size: 24px !important;  /* ここで文字の大きさを変えられます */
-        font-weight: 900 !important;
-        margin: 0 !important;
-    }
-    
     [data-testid="stToolbar"],
     [data-testid="stAppToolbar"],
     .stAppToolbar,
@@ -588,9 +588,6 @@ st.markdown(
 )
 
 # --- APIキー & kintone設定 ---
-# セキュリティのため、キー類はソースコードに直書きせず st.secrets（.streamlit/secrets.toml
-# または Streamlit Community Cloud の Secrets 設定）から読み込む。
-# ローカル開発時は環境変数からのフォールバックも用意。
 def _get_secret(key, env_fallback=None, default=""):
   try:
     if key in st.secrets:
@@ -598,7 +595,6 @@ def _get_secret(key, env_fallback=None, default=""):
   except Exception:
     pass
   return os.environ.get(env_fallback or key, default)
-
 
 GEMINI_API_KEY = _get_secret("GEMINI_API_KEY")
 KINTONE_DOMAIN = _get_secret("KINTONE_DOMAIN", default="cattlook.cybozu.com")
@@ -720,7 +716,6 @@ with st.sidebar:
     st.session_state.reset_ver = next_reset_ver
     st.rerun()
 
-
 # --- 成長曲線パラメータ ---
 GROWTH_CURVE_PARAMS = {
     "雌": {"A": 734.258662, "B": 9.925742, "k": 0.005825},
@@ -728,18 +723,14 @@ GROWTH_CURVE_PARAMS = {
     "全体": {"A": 739.731502, "B": 10.204743, "k": 0.005949},
 }
 
-
 def logistic_weight(t, A, B, k):
   return A / (1 + B * np.exp(-k * t))
-
 
 def logistic_dg(t, A, B, k):
   return (A * B * k * np.exp(-k * t)) / ((1 + B * np.exp(-k * t)) ** 2)
 
-
 def get_growth_params(gender):
   return GROWTH_CURVE_PARAMS.get(gender, GROWTH_CURVE_PARAMS["全体"])
-
 
 # --- 計算ロジック ---
 def calculate_cow_metrics(cow_row):
@@ -801,13 +792,8 @@ def calculate_cow_metrics(cow_row):
       "目標落札額": target_price,
   }
 
-
-# --- kg単価の平均を計算する関数（累計変数による高速化 ＋ 0円除外） ---
+# --- kg単価の平均を計算する関数 ---
 def calculate_average_unit_price():
-  """
-  落札額が確定している牛たちのkg単価の平均を算出する。
-  実際落札額が0以下の牛は自動で除外する。
-  """
   if "avg_unit_price_cache" not in st.session_state or st.session_state.get("metrics_dirty", True):
     total_sum = 0
     count = 0
@@ -825,11 +811,9 @@ def calculate_average_unit_price():
   
   return st.session_state.avg_unit_price_cache
 
-
 def clean_gender(val):
   s = str(val).strip()
   return "雌" if ("雌" in s or "メス" in s or "めす" in s) else "去"
-
 
 # --- Gemini 名簿解析 ---
 def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
@@ -860,7 +844,6 @@ def parse_catalog_file(uploaded_file, key=GEMINI_API_KEY):
     r["個体識別番号"] = str(r.get("個体識別番号", "") or "")
     r["落札者番号"] = ""
   return data
-
 
 # --- kintone 送信 ---
 def send_to_kintone(cows_list):
@@ -920,14 +903,12 @@ def send_to_kintone(cows_list):
       else (False, f"❌ エラー: {res.text}")
   )
 
-
 # --- セッションステート初期化 ---
 if "cows" not in st.session_state:
   if os.path.exists(BACKUP_FILE):
     try:
       with open(BACKUP_FILE, "r", encoding="utf-8") as f:
         st.session_state.cows = json.load(f)
-        # 過去データに落札者番号がない場合の補完
         for c in st.session_state.cows:
             if "落札者番号" not in c:
                 c["落札者番号"] = ""
@@ -975,12 +956,6 @@ if "curr_idx_w" not in st.session_state:
   st.session_state.curr_idx_w = 0
 if "curr_idx_p" not in st.session_state:
   st.session_state.curr_idx_p = 0
-if "input_buffer_w" not in st.session_state:
-  st.session_state.input_buffer_w = ""
-if "input_buffer_p" not in st.session_state:
-  st.session_state.input_buffer_p = ""
-if "p_mode" not in st.session_state: # 落札入力画面のモード管理 ("price" or "buyer")
-  st.session_state.p_mode = "price"
 if "avg_unit_price_cache" not in st.session_state:
   st.session_state.avg_unit_price_cache = 0
 if "total_unit_price_sum" not in st.session_state:
@@ -992,15 +967,12 @@ if "metrics_dirty" not in st.session_state:
 if "reset_ver" not in st.session_state:
   st.session_state.reset_ver = 0
 
-
-# --- 牛のピクトグラムヘルパー ---
 def get_cow_svg(number_str):
   html = f"""<div class="cow-icon-container">
 <img class="cow-img" src="data:image/png;base64,{COW_ICON_B64}" alt="cow"/>
 <div class="cow-number-overlay">{number_str}</div>
 </div>"""
   return html
-
 
 # --- メインタブ（5タブ構成） ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -1011,9 +983,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 セリ結果一覧",
 ])
 
-# =========================================================
-# 画面1: 事前データ自動読み取り画面 ＋ 手動追加機能
-# =========================================================
 with tab1:
   st.subheader("📄 セリ名簿の自動読み取り")
 
@@ -1044,9 +1013,6 @@ with tab1:
           st.session_state.metrics_dirty = True
           st.session_state.curr_idx_w = 0
           st.session_state.curr_idx_p = 0
-          st.session_state.input_buffer_w = ""
-          st.session_state.input_buffer_p = ""
-          st.session_state.p_mode = "price"
           st.session_state.just_parsed_count = len(parsed)
           save_backup()
           st.toast("読み取りが完了しました！", icon="✅")
@@ -1056,7 +1022,6 @@ with tab1:
 
   st.divider()
 
-  # --- ➕ 急遽追加された牛を手動で登録するフォーム ---
   st.subheader("➕ 牛の手動追加（追加・修正用）")
   st.markdown("名簿にない牛が急遽追加された場合や、情報を手動で追加したい場合に登録できます。")
 
@@ -1070,7 +1035,6 @@ with tab1:
 
     submitted = st.form_submit_button("➕ この牛を追加する", use_container_width=True)
     if submitted:
-      # すでに同じNoの牛がいないか確認、あれば上書き、なければ追加
       existing_cow = next((c for c in st.session_state.cows if c["No"] == add_no), None)
       if existing_cow:
         existing_cow["性別"] = add_gender
@@ -1099,14 +1063,12 @@ with tab1:
             "マイナス要素": [],
         }
         st.session_state.cows.append(new_cow)
-        # 出場番号順（No順）にリストを綺麗にソート
         st.session_state.cows = sorted(st.session_state.cows, key=lambda x: x["No"])
         st.toast(f"No.{add_no} を新しく追加しました！", icon="🎉")
       
       st.session_state.metrics_dirty = True
       save_backup()
       st.rerun()
-
 
 # =========================================================
 # 画面2: 体重入力画面（下見）
@@ -1127,44 +1089,18 @@ with tab2:
           step=1,
           key=f"jump_no_w_{idx}",
       )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
-        )
+      if st.button("この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True):
+        target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
         if target_idx is not None:
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
           st.session_state.curr_idx_w = target_idx
-          st.session_state.input_buffer_w = ""
           st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
 
-  display_w = (
-      st.session_state.input_buffer_w
-      if st.session_state.input_buffer_w != ""
-      else (str(cow["体重"]) if cow["体重"] > 0 else "")
-  )
-
   card_html_w = (
-      '<div class="screen-card">'
+      '<div class="screen-card" style="margin-bottom: 4px !important;">'
       '<div class="card-top">'
       f'{get_cow_svg(cow["No"])}'
-      '<div class="input-display-row">'
-      f'<span class="input-display">{display_w}</span>'
-      '<span class="input-unit">kg</span>'
-      "</div>"
       '<div class="cow-meta">'
       f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父:'
       f' <b>{cow["父"]}</b>'
@@ -1184,75 +1120,42 @@ with tab2:
         key=f"neg_pills_{st.session_state.reset_ver}_{idx}",
         label_visibility="collapsed",
     )
-    new_negs = (
-        [f for f in NEGATIVE_FACTORS if f in selected_negs]
-        if selected_negs
-        else []
-    )
+    new_negs = ([f for f in NEGATIVE_FACTORS if f in selected_negs] if selected_negs else [])
     if set(new_negs) != set(current_negs):
       st.session_state.cows[idx]["マイナス要素"] = new_negs
       save_backup()
 
-  with st.container(key="numpad_area_w"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
+  # --- JavaScriptテンキーの呼び出し ---
+  res_w = custom_numpad(
+      key=f"numpad_w_{idx}_{st.session_state.reset_ver}",
+      mode="weight",
+      cow_no=cow["No"],
+      render_key=f"w_{idx}_{st.session_state.reset_ver}",
+      weight_val=str(cow["体重"]).replace(".0", "") if cow["体重"] > 0 else "",
+      price_val="",
+      buyer_val=""
+  )
+  
+  if res_w:
+      # JSからデータが送られてきたら（決定や→が押されたら）Python側に保存
+      if res_w["weight"]:
+          st.session_state.cows[idx]["体重"] = float(res_w["weight"])
+      else:
+          st.session_state.cows[idx]["体重"] = 0
+          
+      st.session_state.metrics_dirty = True
+      save_backup()
 
-    with col_l:
-      if st.button("←", key="prev_w", use_container_width=True):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = max(0, idx - 1)
-        st.session_state.input_buffer_w = ""
-        st.rerun()
-
-    with col_r:
-      with st.container(key="numpad_right_w"):
-        if st.button("BS", key="ce_w", use_container_width=True):
-          st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun()
-
-        if st.button("→", key="next_w", use_container_width=True):
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
+      # アクションに応じた画面移動
+      action = res_w["action"]
+      if action == "next":
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
-          st.session_state.input_buffer_w = ""
           st.rerun()
-
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
-            st.session_state.input_buffer_w += num
-            st.rerun()
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
-        st.session_state.input_buffer_w = ""
-        st.session_state.cows[idx]["体重"] = 0
-        st.session_state.metrics_dirty = True
-        save_backup()
-        st.rerun()
-      if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
-        st.session_state.input_buffer_w += "0"
-        st.rerun()
-      if cols_bottom[2].button(
-          "決定", key="btn_w_enter", use_container_width=True
-      ):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.input_buffer_w = ""
-        st.rerun()
+      elif action == "prev":
+          st.session_state.curr_idx_w = max(0, idx - 1)
+          st.rerun()
+      elif action == "enter":
+          st.rerun() # 保存だけして留まる
 
 
 # =========================================================
@@ -1263,22 +1166,8 @@ with tab3:
   idx = st.session_state.curr_idx_p
   cow = st.session_state.cows[idx]
 
-  # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
   avg_unit_price = calculate_average_unit_price()
-
   calc = calculate_cow_metrics(cow)
-
-  # モードに応じた表示の切り替えと、未入力時のハイフン処理
-  if st.session_state.p_mode == "price":
-      display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-")
-      display_b = str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-"
-      active_price_class = "active-input"
-      active_buyer_class = ""
-  else:
-      display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-"
-      display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-")
-      active_price_class = ""
-      active_buyer_class = "active-input"
 
   neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
   neg_badges_html = "".join(
@@ -1296,29 +1185,10 @@ with tab3:
           step=1,
           key=f"jump_no_p_{idx}",
       )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
-        )
+      if st.button("この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True):
+        target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
         if target_idx is not None:
-          # 移動前に今の状態を保存してモードをリセット
-          if st.session_state.input_buffer_p:
-            if st.session_state.p_mode == "price":
-                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.metrics_dirty = True
-            else:
-                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-            save_backup()
-          st.session_state.p_mode = "price"
           st.session_state.curr_idx_p = target_idx
-          st.session_state.input_buffer_p = ""
           st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
@@ -1338,7 +1208,6 @@ with tab3:
   )
   unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
-  # 画面3専用のインラインスタイルで下の余白をゼロにする
   card_html_p = (
       '<div class="screen-card" style="margin-bottom: 0px !important;">'
       '<div class="card-top">'
@@ -1364,44 +1233,38 @@ with tab3:
   )
   st.markdown(card_html_p, unsafe_allow_html=True)
 
-  # --- 🔴 画面3専用：アクティブな入力モードを強調する動的CSS ---
-  active_css = f"""
-  <style>
-  .st-key-btn_switch_{st.session_state.p_mode} button {{
-      border: 2px solid #f97316 !important;
-      border-bottom: 4px solid #f97316 !important;
-      background-color: #fff7ed !important;
-      color: #ea580c !important;
-  }}
-  </style>
-  """
-  st.markdown(active_css, unsafe_allow_html=True)
+  # --- JavaScriptテンキーの呼び出し ---
+  res_p = custom_numpad(
+      key=f"numpad_p_{idx}_{st.session_state.reset_ver}",
+      mode="price",
+      cow_no=cow["No"],
+      render_key=f"p_{idx}_{st.session_state.reset_ver}",
+      weight_val="",
+      price_val=str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "",
+      buyer_val=cow.get("落札者番号", "")
+  )
 
-  # --- タップで切り替え可能な新しい入力エリア ---
-  with st.container(key="mode_switch_area"):
-      col_p, col_b = st.columns(2)
-      with col_p:
-          if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
-              if st.session_state.p_mode != "price":
-                  # 購買者番号モードから戻る際、入力途中のデータがあれば保存
-                  if st.session_state.input_buffer_p:
-                      st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-                      save_backup()
-                  st.session_state.input_buffer_p = ""
-                  st.session_state.p_mode = "price"
-                  st.rerun()
+  if res_p:
+      # JSからデータが送られてきたら（決定や→が押されたら）Python側に保存
+      if res_p["price"]:
+          st.session_state.cows[idx]["実際落札額"] = int(res_p["price"])
+      else:
+          st.session_state.cows[idx]["実際落札額"] = 0
+          
+      st.session_state.cows[idx]["落札者番号"] = res_p["buyer"]
+      st.session_state.metrics_dirty = True
+      save_backup()
 
-      with col_b:
-          if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
-              if st.session_state.p_mode != "buyer":
-                  # 落札額モードから切り替える際、入力途中のデータがあれば保存
-                  if st.session_state.input_buffer_p:
-                      st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                      st.session_state.metrics_dirty = True
-                      save_backup()
-                  st.session_state.input_buffer_p = ""
-                  st.session_state.p_mode = "buyer"
-                  st.rerun()
+      # アクションに応じた画面移動
+      action = res_p["action"]
+      if action == "next":
+          st.session_state.curr_idx_p = min(total - 1, idx + 1)
+          st.rerun()
+      elif action == "prev":
+          st.session_state.curr_idx_p = max(0, idx - 1)
+          st.rerun()
+      elif action == "enter":
+          st.rerun() # 保存だけして留まる
 
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
@@ -1414,83 +1277,8 @@ with tab3:
       st.session_state.metrics_dirty = True
       save_backup()
 
-  with st.container(key="numpad_area_p"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
-
-    with col_l:
-      if st.button("←", key="prev_p", use_container_width=True):
-        if st.session_state.input_buffer_p:
-          if st.session_state.p_mode == "price":
-              st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-              st.session_state.metrics_dirty = True
-          else:
-              st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-          save_backup()
-        st.session_state.curr_idx_p = max(0, idx - 1)
-        st.session_state.input_buffer_p = ""
-        st.session_state.p_mode = "price" # 常に落札額入力からスタート
-        st.rerun()
-
-    with col_r:
-      with st.container(key="numpad_right_p"):
-        if st.button("BS", key="ce_p", use_container_width=True):
-          st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun()
-
-        if st.button("→", key="next_p", use_container_width=True):
-          if st.session_state.input_buffer_p:
-            if st.session_state.p_mode == "price":
-                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.metrics_dirty = True
-            else:
-                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-            save_backup()
-          st.session_state.curr_idx_p = min(total - 1, idx + 1)
-          st.session_state.input_buffer_p = ""
-          st.session_state.p_mode = "price" # 常に落札額入力からスタート
-          st.rerun()
-
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
-            st.session_state.input_buffer_p += num
-            st.rerun()
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
-        st.session_state.input_buffer_p = ""
-        if st.session_state.p_mode == "price":
-            st.session_state.cows[idx]["実際落札額"] = 0
-            st.session_state.metrics_dirty = True
-        else:
-            st.session_state.cows[idx]["落札者番号"] = ""
-        save_backup()
-        st.rerun()
-      if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
-        st.session_state.input_buffer_p += "0"
-        st.rerun()
-      
-      if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
-        if st.session_state.p_mode == "price":
-            if st.session_state.input_buffer_p:
-                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.metrics_dirty = True
-                save_backup()
-            st.session_state.input_buffer_p = ""
-            st.session_state.p_mode = "buyer" # 決定後、落札者番号モードへ移行
-            st.rerun()
-        else: # buyerモードの場合
-            if st.session_state.input_buffer_p:
-                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-                save_backup()
-            st.session_state.input_buffer_p = ""
-            st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
-            st.rerun()
-
-
 # =========================================================
-# 画面4: kg単価推移グラフ画面（正しい番号順 ＆ Y軸1000〜3500固定）
+# 画面4: kg単価推移グラフ画面
 # =========================================================
 with tab4:
   st.subheader("📈 kg単価の推移グラフ")
@@ -1501,7 +1289,6 @@ with tab4:
   for c in st.session_state.cows:
     p = c.get("実際落札額", 0)
     w = c.get("体重", 0)
-    # 0円や未入力の牛はグラフからも自動除外
     if p and p > 0 and w and w > 0:
       kp = int(round(p * 1000 / w))
       graph_data.append({
@@ -1513,12 +1300,9 @@ with tab4:
 
   if graph_data:
     df_g = pd.DataFrame(graph_data).sort_values("raw_no")
-    
     import altair as alt
-    
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
 
-    # 折れ線グラフ（Y軸のメモリ値を明確に指定）
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
         y=alt.Y(
@@ -1532,21 +1316,11 @@ with tab4:
             title='kg単価 (円)'
         )
     )
-    
-    # 平均値の横線（破線）
     rule_chart = alt.Chart(pd.DataFrame({'y': [avg_kp]})).mark_rule(
-        color='#059669',
-        strokeDash=[5, 5],
-        strokeWidth=2
-    ).encode(
-        y='y:Q'
-    )
+        color='#059669', strokeDash=[5, 5], strokeWidth=2
+    ).encode(y='y:Q')
     
-    # グラフと平均線を重ねる
-    chart = alt.layer(line_chart, rule_chart).properties(
-        height=300
-    )
-    
+    chart = alt.layer(line_chart, rule_chart).properties(height=300)
     st.altair_chart(chart, use_container_width=True)
     
     min_kp = df_g["kg単価(円)"].min()
@@ -1560,7 +1334,6 @@ with tab4:
   else:
     st.info("まだ落札額と体重が入力されたデータがありません。")
 
-
 # =========================================================
 # 画面5: セリ結果一覧表示画面
 # =========================================================
@@ -1569,45 +1342,19 @@ with tab5:
   with top_col1:
     st.subheader("📋 セリ結果一覧表示画面")
   with top_col2:
-    if st.button(
-        "🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True
-    ):
+    if st.button("🔄 今すぐ更新", key="results_manual_refresh", use_container_width=True):
       st.rerun()
 
   my_cows = [c for c in st.session_state.cows if c.get("自社落札", False)]
   st.markdown("#### 🏆 本日落札した牛一覧")
   if my_cows:
     df_my = pd.DataFrame(my_cows)[[
-        "No",
-        "個体識別番号",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "体重",
-        "父",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "実際落札額",
-        "落札者番号",
+        "No", "個体識別番号", "性別", "生年月日", "日齢", "産次", "体重", "父",
+        "母の父", "母の祖父", "母の母の祖父", "摘要", "実際落札額", "落札者番号",
     ]]
     df_my.columns = [
-        "出場番号",
-        "個体識別番号",
-        "性別",
-        "生年月日",
-        "日齢",
-        "産次",
-        "当日体重(kg)",
-        "父牛",
-        "母の父",
-        "母の祖父",
-        "母の母の祖父",
-        "摘要",
-        "落札額(千円)",
-        "落札者番号",
+        "出場番号", "個体識別番号", "性別", "生年月日", "日齢", "産次", "当日体重(kg)",
+        "父牛", "母の父", "母の祖父", "母の母の祖父", "摘要", "落札額(千円)", "落札者番号",
     ]
     st.dataframe(df_my, use_container_width=True, hide_index=True)
   else:
@@ -1635,11 +1382,7 @@ with tab5:
         "損益分岐点(千円)": m["ボーダー価格"],
         "落札額(千円)": c["実際落札額"],
         "落札者番号": c.get("落札者番号", ""),
-        "購入結果": (
-            "自社落札"
-            if c.get("自社落札", False)
-            else ("他社落札" if c["実際落札額"] > 0 else "-")
-        ),
+        "購入結果": "自社落札" if c.get("自社落札", False) else ("他社落札" if c["実際落札額"] > 0 else "-"),
     })
   df_all = pd.DataFrame(all_rows)
   st.dataframe(df_all, use_container_width=True, hide_index=True)
@@ -1649,11 +1392,7 @@ with tab5:
   if st.session_state.get("kintone_sent_success"):
     st.success("✅ kintoneにデータを正常に送信しました！")
     st.info("💡 入力値をリセットし、次回のセリの準備をします。")
-    if st.button(
-        "🧹 画面をリセットして次のセリへ",
-        type="primary",
-        use_container_width=True,
-    ):
+    if st.button("🧹 画面をリセットして次のセリへ", type="primary", use_container_width=True):
       clear_backup()
       clean_cows = []
       for c in st.session_state.cows:
@@ -1670,16 +1409,11 @@ with tab5:
       st.session_state.cows = clean_cows
       st.session_state.curr_idx_w = 0
       st.session_state.curr_idx_p = 0
-      st.session_state.input_buffer_w = ""
-      st.session_state.input_buffer_p = ""
-      st.session_state.p_mode = "price"
       st.session_state.metrics_dirty = True
       st.session_state.kintone_sent_success = False
       st.rerun()
   else:
-    if st.button(
-        "☁️ タップでkintoneに送る", type="primary", use_container_width=True
-    ):
+    if st.button("☁️ タップでkintoneに送る", type="primary", use_container_width=True):
       with st.spinner("kintoneにデータを送信中..."):
         success, msg = send_to_kintone(st.session_state.cows)
         if success:
