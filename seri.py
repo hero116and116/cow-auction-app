@@ -278,14 +278,14 @@ COMPONENT_HTML = """
 # その URL が失敗するため、HTML / CSS / JS をアプリ本文に直接マウントする V2 を使う。
 NUMPAD_HTML = '<div id="numpad-app"></div>'
 NUMPAD_CSS = """
-#numpad-app { padding-top: 4px; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
+#numpad-app { padding-top: 0; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
 .np-row { display: flex; gap: 6px; margin-bottom: 6px; }
 .np-button { flex: 1; height: 72px; padding: 0; color: #1e293b; font-size: 28px; font-weight: 700; background: #fff; border: 1px solid #94a3b8; border-radius: 4px; touch-action: manipulation; }
 .np-button:active { color: #3b82f6; background: #f1f5f9; border-color: #3b82f6; }
 .np-enter { color: #fff; background: #3b82f6; border-color: #3b82f6; }.np-clear { color: #dc2626; background: #f1f5f9; }
 .np-side { width: 100%; font-size: 22px; }.np-prev { height: 306px; }.np-next { height: 228px; }.np-bs { width: 100%; height: 72px; margin-bottom: 6px; color: #c2410c; font-size: 16px; background: #fff7ed; }
 .np-display { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 4px 0 12px; }.np-value { display: inline-block; min-width: 160px; height: 40px; overflow: hidden; color: #1e293b; font-size: 32px; font-weight: 800; line-height: 40px; text-align: right; white-space: nowrap; border-bottom: 2px solid #1e293b; }.np-unit { padding-bottom: 2px; color: #1e293b; font-size: 18px; font-weight: 700; }
-.np-switch { display: flex; gap: 6px; margin: 4px 0 12px; }.np-mode { flex: 1; height: 70px; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }.np-mode-active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
+.np-switch { display: flex; gap: 6px; margin: 0 0 12px; }.np-mode { flex: 1; height: 70px; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }.np-mode-active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
 """
 NUMPAD_JS = """
 export default function(component) {
@@ -616,21 +616,21 @@ st.markdown(
     }
 
     .st-key-purchase_check_area_p {
-        margin: 2px 0 0;
+        margin: 0;
         padding: 0 8px;
         background-color: #ffffff;
     }
     .st-key-purchase_check_area_p div[data-testid="stCheckbox"] {
         display: flex;
         justify-content: flex-end;
-        min-height: 28px !important;
+        min-height: 22px !important;
         margin: 0 !important;
     }
     .st-key-purchase_check_area_p div[data-testid="stCheckbox"] label {
-        min-height: 28px !important;
+        min-height: 22px !important;
         padding: 0 !important;
         font-size: 13px !important;
-        line-height: 28px !important;
+        line-height: 22px !important;
     }
 
     .st-key-negative_factors_area_w {
