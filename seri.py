@@ -1126,7 +1126,7 @@ with tab2:
 
     with col_r:
       with st.container(key="numpad_right_w"):
-        if st.button("CE", key="ce_w", use_container_width=True):
+        if st.button("BS", key="ce_w", use_container_width=True):
           st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
           st.rerun()
 
@@ -1301,7 +1301,7 @@ with tab3:
 
     with col_r:
       with st.container(key="numpad_right_p"):
-        if st.button("CE", key="ce_p", use_container_width=True):
+        if st.button("BS", key="ce_p", use_container_width=True):
           st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
           st.rerun()
 
