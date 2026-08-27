@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 from streamlit.components.v1 import html as st_html
 
 # --- 牛のピクトグラム画像（Base64形式） ---
@@ -275,12 +274,52 @@ COMPONENT_HTML = """
 </html>
 """
 
-# コンポーネント資産はデプロイ済みの固定ファイルを直接配信する。
-# cwd は Streamlit Cloud / コンテナの起動方法で変わるため使わない。
-# 実行時に HTML を生成すると、プロキシが component URL を解決できず
-# 「having trouble loading ... component」になることがある。
-COMPONENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "numpad_comp")
-custom_numpad = components.declare_component("custom_numpad", path=COMPONENT_DIR)
+# V1 の declare_component は iframe 用アセット URL を別途読み込む。プロキシ配下で
+# その URL が失敗するため、HTML / CSS / JS をアプリ本文に直接マウントする V2 を使う。
+NUMPAD_HTML = '<div id="numpad-app"></div>'
+NUMPAD_CSS = """
+#numpad-app { padding-top: 4px; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
+.np-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.np-button { flex: 1; height: 72px; padding: 0; color: #1e293b; font-size: 28px; font-weight: 700; background: #fff; border: 1px solid #94a3b8; border-radius: 4px; touch-action: manipulation; }
+.np-button:active { color: #3b82f6; background: #f1f5f9; border-color: #3b82f6; }
+.np-enter { color: #fff; background: #3b82f6; border-color: #3b82f6; }.np-clear { color: #dc2626; background: #f1f5f9; }
+.np-side { width: 100%; font-size: 22px; }.np-prev { height: 306px; }.np-next { height: 228px; }.np-bs { width: 100%; height: 72px; margin-bottom: 6px; color: #c2410c; font-size: 16px; background: #fff7ed; }
+.np-display { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 4px 0 12px; }.np-value { display: inline-block; min-width: 160px; height: 40px; overflow: hidden; color: #1e293b; font-size: 32px; font-weight: 800; line-height: 40px; text-align: right; white-space: nowrap; border-bottom: 2px solid #1e293b; }.np-unit { padding-bottom: 2px; color: #1e293b; font-size: 18px; font-weight: 700; }
+.np-switch { display: flex; gap: 6px; margin: 4px 0 12px; }.np-mode { flex: 1; height: 70px; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }.np-mode-active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
+"""
+NUMPAD_JS = """
+export default function(component) {
+  const { data, parentElement, setTriggerValue } = component;
+  const app = parentElement.querySelector('#numpad-app');
+  let state = parentElement._numpadState;
+  if (!state || state.renderKey !== data.render_key) {
+    state = { renderKey: data.render_key, mode: data.mode, weight: data.weight_val || '', price: data.price_val || '', buyer: data.buyer_val || '', active: 'price' };
+    parentElement._numpadState = state;
+  }
+  const bufferName = () => state.mode === 'weight' ? 'weight' : state.active;
+  const emit = (action) => setTriggerValue('submit', { action, weight: state.weight, price: state.price, buyer: state.buyer });
+  function draw() {
+    const display = state.mode === 'weight'
+      ? `<div class="np-display"><span class="np-value">${state.weight}</span><span class="np-unit">kg</span></div>`
+      : `<div class="np-switch"><button class="np-mode ${state.active === 'price' ? 'np-mode-active' : ''}" data-mode="price">額: ${state.price || '-'} 千円</button><button class="np-mode ${state.active === 'buyer' ? 'np-mode-active' : ''}" data-mode="buyer">購買No: ${state.buyer || '-'}</button></div>`;
+    app.innerHTML = `${display}<div style="display:flex;gap:6px"><div style="flex:.8"><button class="np-button np-side np-prev" data-action="prev">←</button></div><div style="flex:4.6"><div class="np-row">${['7','8','9'].map(n => `<button class="np-button" data-num="${n}">${n}</button>`).join('')}</div><div class="np-row">${['4','5','6'].map(n => `<button class="np-button" data-num="${n}">${n}</button>`).join('')}</div><div class="np-row">${['1','2','3'].map(n => `<button class="np-button" data-num="${n}">${n}</button>`).join('')}</div><div class="np-row" style="margin-bottom:0"><button class="np-button np-clear" data-action="clear">C</button><button class="np-button" data-num="0">0</button><button class="np-button np-enter" data-action="enter">決定</button></div></div><div style="flex:.8;display:flex;flex-direction:column"><button class="np-button np-bs" data-action="backspace">BS</button><button class="np-button np-side np-next" data-action="next">→</button></div></div>`;
+    app.querySelectorAll('[data-num]').forEach(button => button.onclick = () => { state[bufferName()] += button.dataset.num; draw(); });
+    app.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => { state.active = button.dataset.mode; draw(); });
+    app.querySelectorAll('[data-action]').forEach(button => button.onclick = () => {
+      const action = button.dataset.action;
+      if (action === 'clear') state[bufferName()] = '';
+      else if (action === 'backspace') state[bufferName()] = state[bufferName()].slice(0, -1);
+      else if (action === 'enter' && state.mode === 'price' && state.active === 'price') state.active = 'buyer';
+      else if (action === 'enter' || action === 'next' || action === 'prev') return emit(action);
+      draw();
+    });
+  }
+  draw();
+}
+"""
+custom_numpad = st.components.v2.component(
+    "inline_numpad", html=NUMPAD_HTML, css=NUMPAD_CSS, js=NUMPAD_JS
+)
 
 
 st.set_page_config(
@@ -1336,24 +1375,22 @@ with tab2:
   # --- JavaScriptテンキーの呼び出し ---
   res_w = custom_numpad(
       key=f"numpad_w_{idx}_{st.session_state.reset_ver}",
-      mode="weight",
-      cow_no=cow["No"],
-      render_key=f"w_{idx}_{st.session_state.reset_ver}",
-      weight_val=str(cow["体重"]).replace(".0", "") if cow["体重"] > 0 else "",
-      price_val="",
-      buyer_val=""
+      data={"mode": "weight", "render_key": f"w_{idx}_{st.session_state.reset_ver}", "weight_val": str(cow["体重"]).replace(".0", "") if cow["体重"] > 0 else "", "price_val": "", "buyer_val": ""},
+      height=340,
+      on_submit_change=lambda: None,
   )
   
-  if res_w:
-      if res_w["weight"]:
-          st.session_state.cows[idx]["体重"] = float(res_w["weight"])
+  action_w = getattr(res_w, "submit", None)
+  if action_w:
+      if action_w["weight"]:
+          st.session_state.cows[idx]["体重"] = float(action_w["weight"])
       else:
           st.session_state.cows[idx]["体重"] = 0
           
       st.session_state.metrics_dirty = True
       save_backup()
 
-      action = res_w["action"]
+      action = action_w["action"]
       if action == "next":
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
           st.rerun()
@@ -1442,25 +1479,23 @@ with tab3:
   # --- JavaScriptテンキーの呼び出し ---
   res_p = custom_numpad(
       key=f"numpad_p_{idx}_{st.session_state.reset_ver}",
-      mode="price",
-      cow_no=cow["No"],
-      render_key=f"p_{idx}_{st.session_state.reset_ver}",
-      weight_val="",
-      price_val=str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "",
-      buyer_val=cow.get("落札者番号", "")
+      data={"mode": "price", "render_key": f"p_{idx}_{st.session_state.reset_ver}", "weight_val": "", "price_val": str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "", "buyer_val": cow.get("落札者番号", "")},
+      height=415,
+      on_submit_change=lambda: None,
   )
 
-  if res_p:
-      if res_p["price"]:
-          st.session_state.cows[idx]["実際落札額"] = int(res_p["price"])
+  action_p = getattr(res_p, "submit", None)
+  if action_p:
+      if action_p["price"]:
+          st.session_state.cows[idx]["実際落札額"] = int(action_p["price"])
       else:
           st.session_state.cows[idx]["実際落札額"] = 0
           
-      st.session_state.cows[idx]["落札者番号"] = res_p["buyer"]
+      st.session_state.cows[idx]["落札者番号"] = action_p["buyer"]
       st.session_state.metrics_dirty = True
       save_backup()
 
-      action = res_p["action"]
+      action = action_p["action"]
       if action == "next":
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
           st.rerun()
