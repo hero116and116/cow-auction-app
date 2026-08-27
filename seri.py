@@ -229,23 +229,19 @@ COMPONENT_HTML = """
 </html>
 """
 
-# Streamlitの裏側にコンポーネントを準備（Streamlit Cloudでも確実に読み込めるようにカレントディレクトリに作成）
-_COMP_DIR = os.path.join(os.getcwd(), "numpad_comp")
-os.makedirs(_COMP_DIR, exist_ok=True)
-_COMP_FILE = os.path.join(_COMP_DIR, "index.html")
-
-# 無限リロードを防ぐため、内容が変わった時だけファイルを書き換える
-_should_write = True
-if os.path.exists(_COMP_FILE):
-    with open(_COMP_FILE, "r", encoding="utf-8") as f:
-        if f.read() == COMPONENT_HTML:
-            _should_write = False
-
-if _should_write:
-    with open(_COMP_FILE, "w", encoding="utf-8") as f:
+# Streamlitの裏側にコンポーネントを準備
+# @st.cache_resource でプロセス起動中に一度だけ実行し、
+# 複数セッション/複数リクエストによるファイル書き込みの競合(読み込み失敗の原因)を防ぐ
+@st.cache_resource
+def _setup_numpad_component():
+    comp_dir = os.path.join(os.getcwd(), "numpad_comp")
+    os.makedirs(comp_dir, exist_ok=True)
+    comp_file = os.path.join(comp_dir, "index.html")
+    with open(comp_file, "w", encoding="utf-8") as f:
         f.write(COMPONENT_HTML)
+    return components.declare_component("custom_numpad", path=comp_dir)
 
-custom_numpad = components.declare_component("custom_numpad", path=_COMP_DIR)
+custom_numpad = _setup_numpad_component()
 
 
 st.set_page_config(
