@@ -1,7 +1,6 @@
 import json
 import os
 import textwrap
-import tempfile
 from google import genai
 from google.genai import types
 import numpy as np
@@ -230,12 +229,22 @@ COMPONENT_HTML = """
 </html>
 """
 
-# Streamlitの裏側にコンポーネントを準備（※絶対パス＋一時フォルダを使用してエラーを回避）
-_COMP_DIR = os.path.join(tempfile.gettempdir(), "numpad_comp")
-if not os.path.exists(_COMP_DIR):
-    os.makedirs(_COMP_DIR, exist_ok=True)
-with open(os.path.join(_COMP_DIR, "index.html"), "w", encoding="utf-8") as f:
-    f.write(COMPONENT_HTML)
+# Streamlitの裏側にコンポーネントを準備（Streamlit Cloudでも確実に読み込めるようにカレントディレクトリに作成）
+_COMP_DIR = os.path.join(os.getcwd(), "numpad_comp")
+os.makedirs(_COMP_DIR, exist_ok=True)
+_COMP_FILE = os.path.join(_COMP_DIR, "index.html")
+
+# 無限リロードを防ぐため、内容が変わった時だけファイルを書き換える
+_should_write = True
+if os.path.exists(_COMP_FILE):
+    with open(_COMP_FILE, "r", encoding="utf-8") as f:
+        if f.read() == COMPONENT_HTML:
+            _should_write = False
+
+if _should_write:
+    with open(_COMP_FILE, "w", encoding="utf-8") as f:
+        f.write(COMPONENT_HTML)
+
 custom_numpad = components.declare_component("custom_numpad", path=_COMP_DIR)
 
 
@@ -1301,7 +1310,6 @@ with tab2:
   )
   
   if res_w:
-      # JSからデータが送られてきたら（決定や→が押されたら）Python側に保存
       if res_w["weight"]:
           st.session_state.cows[idx]["体重"] = float(res_w["weight"])
       else:
@@ -1310,7 +1318,6 @@ with tab2:
       st.session_state.metrics_dirty = True
       save_backup()
 
-      # アクションに応じた画面移動
       action = res_w["action"]
       if action == "next":
           st.session_state.curr_idx_w = min(total - 1, idx + 1)
@@ -1319,7 +1326,7 @@ with tab2:
           st.session_state.curr_idx_w = max(0, idx - 1)
           st.rerun()
       elif action == "enter":
-          st.rerun() # 保存だけして留まる
+          st.rerun() 
 
 
 # =========================================================
@@ -1409,7 +1416,6 @@ with tab3:
   )
 
   if res_p:
-      # JSからデータが送られてきたら（決定や→が押されたら）Python側に保存
       if res_p["price"]:
           st.session_state.cows[idx]["実際落札額"] = int(res_p["price"])
       else:
@@ -1419,7 +1425,6 @@ with tab3:
       st.session_state.metrics_dirty = True
       save_backup()
 
-      # アクションに応じた画面移動
       action = res_p["action"]
       if action == "next":
           st.session_state.curr_idx_p = min(total - 1, idx + 1)
@@ -1428,7 +1433,7 @@ with tab3:
           st.session_state.curr_idx_p = max(0, idx - 1)
           st.rerun()
       elif action == "enter":
-          st.rerun() # 保存だけして留まる
+          st.rerun() 
 
   with st.container(key="purchase_check_area_p"):
     purchased = st.checkbox(
