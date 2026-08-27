@@ -519,7 +519,7 @@ st.markdown(
     }
     .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
         height: 54px !important;
-        font-size: 36px !important;
+        font-size: 100px !important;
         font-weight: 800 !important;
         background-color: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
