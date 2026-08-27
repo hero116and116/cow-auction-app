@@ -199,6 +199,7 @@ st.markdown(
         white-space: nowrap !important;
     }
 
+    /* 👇元の16pxに完全に戻しました（画面2への影響をなくすため） */
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
@@ -305,12 +306,6 @@ st.markdown(
         text-align: right;
         white-space: nowrap;
         overflow: hidden;
-    }
-    
-    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
-    .active-input {
-        border-bottom: 4px solid #f97316 !important;
-        background-color: #fff7ed !important;
     }
     
     .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
@@ -508,6 +503,7 @@ st.markdown(
     }
     
     /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
+    /* 👇 マイナスマージンを調整し、文字1つ分（約20px）下に下げました */
     .st-key-mode_switch_area {
         margin-top: -26px !important; 
     }
@@ -523,7 +519,7 @@ st.markdown(
     }
     /* ボタンの枠のサイズ設定 */
     .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
-        height: 70px !important; 
+        height: 70px !important; /* 文字に合わせて枠も少し大きくしました */
         background-color: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
         border-radius: 8px !important;
@@ -532,9 +528,9 @@ st.markdown(
         margin-bottom: 8px !important;
     }
     
-    /* ボタンの中の「文字」を直接指定して強制的に大きくする */
+    /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
     .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
-        font-size: 30px !important;  
+        font-size: 30px !important;  /* ここで文字の大きさを変えられます */
         font-weight: 900 !important;
         margin: 0 !important;
     }
@@ -869,7 +865,8 @@ def send_to_kintone(cows_list):
           "予測出荷体重": {"value": calc["予測出荷体重"]},
           "実際落札額": {"value": price},
           "購入結果": {"value": status},
-          "落札者番号": {"value": str(c.get("落札者番号", ""))},
+          # ※ キントーン側に「落札者番号」フィールドを追加した後に、以下の行のコメントアウトを外して有効化してください
+          # "落札者番号": {"value": str(c.get("落札者番号", ""))},
           "設定枝肉単価": {"value": settings["carcass_price"]},
           "設定育成コスト": {"value": settings["daily_cost"]},
           "設定出荷日齢": {"value": settings["shipment_days"]},
@@ -1350,7 +1347,7 @@ with tab3:
   with st.container(key="mode_switch_area"):
       col_p, col_b = st.columns(2)
       with col_p:
-          if st.button(f"額: {display_p}", key="btn_switch_price", use_container_width=True):
+          if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
               if st.session_state.p_mode != "price":
                   # 購買者番号モードから戻る際、入力途中のデータがあれば保存
                   if st.session_state.input_buffer_p:
@@ -1361,7 +1358,7 @@ with tab3:
                   st.rerun()
 
       with col_b:
-          if st.button(f"購買: {display_b}", key="btn_switch_buyer", use_container_width=True):
+          if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
               if st.session_state.p_mode != "buyer":
                   # 落札額モードから切り替える際、入力途中のデータがあれば保存
                   if st.session_state.input_buffer_p:
