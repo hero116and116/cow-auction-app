@@ -285,7 +285,7 @@ NUMPAD_CSS = """
 .np-enter { color: #fff; background: #3b82f6; border-color: #3b82f6; }.np-clear { color: #dc2626; background: #f1f5f9; }
 .np-side { width: 100%; font-size: 22px; }.np-prev { height: 306px; }.np-next { height: 228px; }.np-bs { width: 100%; height: 72px; margin-bottom: 6px; color: #c2410c; font-size: 16px; background: #fff7ed; }
 .np-display { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin: 4px 0 12px; }.np-value { display: inline-block; min-width: 160px; height: 40px; overflow: hidden; color: #1e293b; font-size: 32px; font-weight: 800; line-height: 40px; text-align: right; white-space: nowrap; border-bottom: 2px solid #1e293b; }.np-unit { padding-bottom: 2px; color: #1e293b; font-size: 18px; font-weight: 700; }
-.np-switch { display: flex; gap: 6px; margin: 4px 0 12px; }.np-mode { flex: 1; height: 70px; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }.np-mode-active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
+.np-switch { display: flex; gap: 6px; margin: 4px 0 12px; }.np-mode { flex: 1; height: 94px; color: #475569; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; }.np-mode-active { color: #ea580c; background: #fff7ed; border-color: #f97316; border-bottom-width: 4px; }
 """
 NUMPAD_JS = """
 export default function(component) {
@@ -1499,7 +1499,7 @@ with tab3:
   res_p = custom_numpad(
       key=f"numpad_p_{idx}_{st.session_state.reset_ver}",
       data={"mode": "price", "render_key": f"p_{idx}_{st.session_state.reset_ver}", "weight_val": "", "price_val": str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "", "buyer_val": cow.get("落札者番号", "")},
-      height=415,
+      height=440,
       on_submit_change=lambda: None,
   )
 
