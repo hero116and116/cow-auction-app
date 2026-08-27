@@ -616,13 +616,21 @@ st.markdown(
     }
 
     .st-key-purchase_check_area_p {
-        margin: 8px 0 0;
+        margin: 2px 0 0;
         padding: 0 8px;
         background-color: #ffffff;
     }
     .st-key-purchase_check_area_p div[data-testid="stCheckbox"] {
         display: flex;
         justify-content: flex-end;
+        min-height: 28px !important;
+        margin: 0 !important;
+    }
+    .st-key-purchase_check_area_p div[data-testid="stCheckbox"] label {
+        min-height: 28px !important;
+        padding: 0 !important;
+        font-size: 13px !important;
+        line-height: 28px !important;
     }
 
     .st-key-negative_factors_area_w {
