@@ -199,13 +199,15 @@ st.markdown(
         white-space: nowrap !important;
     }
 
+    /* 👇元の16pxに完全に戻しました（画面2への影響をなくすため） */
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
-        margin-bottom: 0px !important; /* 隙間を完全に無くすため0に変更 */
+        margin-bottom: 16px; 
         overflow: hidden;
         background-color: #ffffff;
     }
+    
     .card-top {
         padding: 20px 18px 16px 18px;
         text-align: center;
@@ -501,8 +503,9 @@ st.markdown(
     }
     
     /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
+    /* 👇 マイナスマージンを調整し、文字1つ分（約20px）下に下げました */
     .st-key-mode_switch_area {
-        margin-top: -24px !important; /* Streamlitのデフォルトの隙間をマイナスマージンで打ち消す */
+        margin-top: -4px !important; 
     }
     .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
@@ -1295,9 +1298,9 @@ with tab3:
   )
   unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
-  # 画面3ではHTMLから直接的な入力欄出力を省き、Streamlitのボタンで疑似的に入力欄を描画する
+  # 画面3専用のインラインスタイルで下の余白をゼロにする
   card_html_p = (
-      '<div class="screen-card">'
+      '<div class="screen-card" style="margin-bottom: 0px !important;">'
       '<div class="card-top">'
       '<div class="cow-top-row">'
       '<div class="cow-info-col cow-meta">'
