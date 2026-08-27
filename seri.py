@@ -117,11 +117,57 @@ COMPONENT_HTML = """
         border-color: #f97316; border-bottom: 4px solid #f97316; background-color: #fff7ed; color: #ea580c;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.3.0/dist/streamlit.js"></script>
 </head>
 <body>
   <div id="app"></div>
   <script>
+    // --- Streamlitコンポーネント通信の自前実装 ---
+    // 外部CDN(jsdelivr)への依存をなくし、電波が弱い環境でも
+    // コンポーネントの読み込みが失敗しないようにするための最小限の実装。
+    // streamlit-component-lib が使うpostMessageプロトコルを直接扱う。
+    window.Streamlit = (function () {
+      const RENDER_EVENT = "streamlit:render";
+      const target = new EventTarget();
+      let lastHeight = null;
+
+      window.addEventListener("message", function (event) {
+        const data = event.data;
+        if (!data || data.type !== "streamlit:render") return;
+        target.dispatchEvent(new CustomEvent(RENDER_EVENT, { detail: data }));
+      });
+
+      function setComponentValue(value) {
+        window.parent.postMessage(
+            { type: "streamlit:setComponentValue", value: value, dataType: "json" },
+            "*"
+        );
+      }
+
+      function setFrameHeight(height) {
+        if (height === lastHeight) return;
+        lastHeight = height;
+        window.parent.postMessage(
+            { type: "streamlit:setFrameHeight", height: height },
+            "*"
+        );
+      }
+
+      function setComponentReady() {
+        window.parent.postMessage(
+            { type: "streamlit:componentReady", apiVersion: 1 },
+            "*"
+        );
+      }
+
+      return {
+        RENDER_EVENT: RENDER_EVENT,
+        events: target,
+        setComponentValue: setComponentValue,
+        setFrameHeight: setFrameHeight,
+        setComponentReady: setComponentReady
+      };
+    })();
+
     let renderKey = "";
     let mode = "";
     let cowNo = -1;
@@ -230,8 +276,9 @@ COMPONENT_HTML = """
 """
 
 # Streamlitの裏側にコンポーネントを準備
-# @st.cache_resource でプロセス起動中に一度だけ実行し、
-# 複数セッション/複数リクエストによるファイル書き込みの競合(読み込み失敗の原因)を防ぐ
+# @st.cache_resource でアプリプロセス起動後の最初の1回だけ実行する。
+# 複数人が同時に操作した際に、ファイル書き込みとコンポーネント読み込みが
+# 競合してエラーになるのを防ぐ。
 @st.cache_resource
 def _setup_numpad_component():
     comp_dir = os.path.join(os.getcwd(), "numpad_comp")
