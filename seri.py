@@ -1,6 +1,7 @@
 import json
 import os
 import textwrap
+import tempfile
 from google import genai
 from google.genai import types
 import numpy as np
@@ -76,7 +77,7 @@ COW_ICON_B64 = (
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOT1fwEGADRsF694441vAAAAAElFTkSuQmCC"
 )
 
-# --- 🚀 究極の高速化：JavaScriptテンキーの生成（内部でHTMLファイルを作成） ---
+# --- 🚀 究極の高速化：JavaScriptテンキーの生成 ---
 COMPONENT_HTML = """
 <!DOCTYPE html>
 <html lang="ja">
@@ -229,12 +230,13 @@ COMPONENT_HTML = """
 </html>
 """
 
-# Streamlitの裏側にコンポーネントを準備
-if not os.path.exists("numpad_comp"):
-    os.makedirs("numpad_comp")
-with open("numpad_comp/index.html", "w", encoding="utf-8") as f:
+# Streamlitの裏側にコンポーネントを準備（※絶対パス＋一時フォルダを使用してエラーを回避）
+_COMP_DIR = os.path.join(tempfile.gettempdir(), "numpad_comp")
+if not os.path.exists(_COMP_DIR):
+    os.makedirs(_COMP_DIR, exist_ok=True)
+with open(os.path.join(_COMP_DIR, "index.html"), "w", encoding="utf-8") as f:
     f.write(COMPONENT_HTML)
-custom_numpad = components.declare_component("custom_numpad", path="numpad_comp")
+custom_numpad = components.declare_component("custom_numpad", path=_COMP_DIR)
 
 
 st.set_page_config(
@@ -361,6 +363,7 @@ st.markdown(
         white-space: nowrap !important;
     }
 
+    /* 👇元の16pxに完全に戻しました（画面2への影響をなくすため） */
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
@@ -446,6 +449,36 @@ st.markdown(
         align-items: flex-end;
         gap: 3px;
     }
+
+    .input-display-row {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .input-display {
+        font-size: 32px;
+        font-weight: 800;
+        color: #1e293b;
+        border-bottom: 2px solid #1e293b;
+        display: inline-block;
+        min-width: 160px;
+        height: 40px;
+        line-height: 40px;
+        padding: 2px 6px;
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    
+    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
+    .active-input {
+        border-bottom: 4px solid #f97316 !important;
+        background-color: #fff7ed !important;
+    }
+    
+    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; }
 
     .cow-meta {
         margin-top: 10px;
@@ -541,6 +574,137 @@ st.markdown(
         white-space: nowrap !important;
     }
 
+    .st-key-numpad_area_w, .st-key-numpad_area_p {
+        border: 2px solid #1e293b;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        margin-top: -16px;
+        padding: 12px 6px 16px 6px;
+        background-color: #ffffff;
+    }
+
+    .st-key-numpad_area_w div[data-testid="stHorizontalBlock"],
+    .st-key-numpad_area_p div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+    .st-key-numpad_area_w div[data-testid="stColumn"],
+    .st-key-numpad_area_p div[data-testid="stColumn"],
+    .st-key-numpad_area_w div[data-testid="column"],
+    .st-key-numpad_area_p div[data-testid="column"] {
+        width: auto !important;
+        min-width: 0 !important;
+    }
+    .st-key-numpad_area_w button,
+    .st-key-numpad_area_p button {
+        height: 72px !important;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        padding: 0 !important;
+    }
+    .st-key-numpad_area_w button:hover,
+    .st-key-numpad_area_p button:hover { border-color: #3b82f6 !important; color: #3b82f6 !important; }
+    .st-key-numpad_area_w button:focus,
+    .st-key-numpad_area_p button:focus,
+    .st-key-numpad_area_w button:focus-visible,
+    .st-key-numpad_area_p button:focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    .st-key-btn_w_enter button, .st-key-btn_p_enter button {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+        border-color: #3b82f6 !important;
+    }
+    .st-key-btn_w_c button, .st-key-btn_p_c button {
+        background-color: #f1f5f9 !important;
+        color: #dc2626 !important;
+    }
+
+    .st-key-numpad_area_w div[data-testid="element-container"],
+    .st-key-numpad_area_p div[data-testid="element-container"] {
+        margin: 0 !important;
+    }
+    .st-key-numpad_area_w div[data-testid="element-container"]:not(:last-child),
+    .st-key-numpad_area_p div[data-testid="element-container"]:not(:last-child) {
+        margin-bottom: 6px !important;
+    }
+
+    .st-key-prev_w button, .st-key-prev_p button {
+        height: 306px !important;
+        font-size: 22px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        margin-top: 0 !important;
+    }
+
+    .st-key-ce_w button, .st-key-ce_p button {
+        height: 72px !important;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #fff7ed !important;
+        color: #c2410c !important;
+        padding: 0 !important;
+    }
+    .st-key-ce_w button:hover, .st-key-ce_p button:hover {
+        border-color: #3b82f6 !important;
+        color: #3b82f6 !important;
+    }
+    .st-key-next_w button, .st-key-next_p button {
+        height: 228px !important;
+        font-size: 22px !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        border: 1px solid #94a3b8 !important;
+        background-color: #ffffff !important;
+        color: #1e293b !important;
+        margin-top: 0 !important;
+    }
+    
+    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
+    /* 👇 マイナスマージンを調整した*/
+    .st-key-mode_switch_area {
+        margin-top: -26px !important; 
+    }
+    .st-key-mode_switch_area div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+    .st-key-mode_switch_area div[data-testid="stColumn"],
+    .st-key-mode_switch_area div[data-testid="column"] {
+        width: 50% !important;
+        min-width: 0 !important;
+    }
+    /* ボタンの枠のサイズ設定 */
+    .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
+        height: 70px !important; /* 文字に合わせて枠も少し大きくしました */
+        background-color: #f8fafc !important;
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        color: #475569 !important;
+        padding: 4px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
+    .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
+        font-size: 24px !important;  /* ここで文字の大きさを変えられます */
+        font-weight: 900 !important;
+        margin: 0 !important;
+    }
+    
     [data-testid="stToolbar"],
     [data-testid="stAppToolbar"],
     .stAppToolbar,
