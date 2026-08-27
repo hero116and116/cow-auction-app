@@ -1111,333 +1111,320 @@ with tab1:
 # =========================================================
 # 画面2: 体重入力画面（下見）
 # =========================================================
-with tab2:
-  total = len(st.session_state.cows)
-  idx = st.session_state.curr_idx_w
-  cow = st.session_state.cows[idx]
+@st.fragment
+def _render_tab2():
+    total = len(st.session_state.cows)
+    idx = st.session_state.curr_idx_w
+    cow = st.session_state.cows[idx]
 
-  with st.container(key="no_jump_w"):
-    with st.popover(f"No.{cow['No']} ✎"):
-      nos = [c["No"] for c in st.session_state.cows]
-      target_no = st.number_input(
-          "出場番号を入力して移動",
-          min_value=int(min(nos)),
-          max_value=int(max(nos)),
-          value=int(cow["No"]),
-          step=1,
-          key=f"jump_no_w_{idx}",
-      )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
+    with st.container(key="no_jump_w"):
+      with st.popover(f"No.{cow['No']} ✎"):
+        nos = [c["No"] for c in st.session_state.cows]
+        target_no = st.number_input(
+            "出場番号を入力して移動",
+            min_value=int(min(nos)),
+            max_value=int(max(nos)),
+            value=int(cow["No"]),
+            step=1,
+            key=f"jump_no_w_{idx}",
         )
-        if target_idx is not None:
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
-          st.session_state.curr_idx_w = target_idx
-          st.session_state.input_buffer_w = ""
-          st.rerun()
-        else:
-          st.warning("その出場番号は見つかりませんでした。")
-
-  display_w = (
-      st.session_state.input_buffer_w
-      if st.session_state.input_buffer_w != ""
-      else (str(cow["体重"]) if cow["体重"] > 0 else "")
-  )
-
-  card_html_w = (
-      '<div class="screen-card">'
-      '<div class="card-top">'
-      f'{get_cow_svg(cow["No"])}'
-      '<div class="input-display-row">'
-      f'<span class="input-display">{display_w}</span>'
-      '<span class="input-unit">kg</span>'
-      "</div>"
-      '<div class="cow-meta">'
-      f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父:'
-      f' <b>{cow["父"]}</b>'
-      "</div>"
-      "</div>"
-      "</div>"
-  )
-  st.markdown(card_html_w, unsafe_allow_html=True)
-
-  with st.container(key="negative_factors_area_w"):
-    current_negs = cow.get("マイナス要素", [])
-    selected_negs = st.pills(
-        "マイナス要素（該当する場合のみ選択）",
-        options=NEGATIVE_FACTORS,
-        selection_mode="multi",
-        default=[f for f in current_negs if f in NEGATIVE_FACTORS],
-        key=f"neg_pills_{st.session_state.reset_ver}_{idx}",
-        label_visibility="collapsed",
-    )
-    new_negs = (
-        [f for f in NEGATIVE_FACTORS if f in selected_negs]
-        if selected_negs
-        else []
-    )
-    if set(new_negs) != set(current_negs):
-      st.session_state.cows[idx]["マイナス要素"] = new_negs
-      save_backup()
-
-  with st.container(key="numpad_area_w"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
-
-    with col_l:
-      if st.button("←", key="prev_w", use_container_width=True):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
+        if st.button(
+            "この番号へ移動", key=f"jump_go_w_{idx}", use_container_width=True
+        ):
+          target_idx = next(
+              (
+                  i
+                  for i, c in enumerate(st.session_state.cows)
+                  if c["No"] == target_no
+              ),
+              None,
           )
-          st.session_state.metrics_dirty = True
-          save_backup()
-        st.session_state.curr_idx_w = max(0, idx - 1)
-        st.session_state.input_buffer_w = ""
-        st.rerun()
-
-    with col_r:
-      with st.container(key="numpad_right_w"):
-        if st.button("BS", key="ce_w", use_container_width=True):
-          st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
-          st.rerun()
-
-        if st.button("→", key="next_w", use_container_width=True):
-          if st.session_state.input_buffer_w:
-            st.session_state.cows[idx]["体重"] = float(
-                st.session_state.input_buffer_w
-            )
-            st.session_state.metrics_dirty = True
-            save_backup()
-          st.session_state.curr_idx_w = min(total - 1, idx + 1)
-          st.session_state.input_buffer_w = ""
-          st.rerun()
-
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
-            st.session_state.input_buffer_w += num
+          if target_idx is not None:
+            if st.session_state.input_buffer_w:
+              st.session_state.cows[idx]["体重"] = float(
+                  st.session_state.input_buffer_w
+              )
+              st.session_state.metrics_dirty = True
+              save_backup()
+            st.session_state.curr_idx_w = target_idx
+            st.session_state.input_buffer_w = ""
             st.rerun()
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
-        st.session_state.input_buffer_w = ""
-        st.session_state.cows[idx]["体重"] = 0
-        st.session_state.metrics_dirty = True
+          else:
+            st.warning("その出場番号は見つかりませんでした。")
+
+    display_w = (
+        st.session_state.input_buffer_w
+        if st.session_state.input_buffer_w != ""
+        else (str(cow["体重"]) if cow["体重"] > 0 else "")
+    )
+
+    card_html_w = (
+        '<div class="screen-card">'
+        '<div class="card-top">'
+        f'{get_cow_svg(cow["No"])}'
+        '<div class="input-display-row">'
+        f'<span class="input-display">{display_w}</span>'
+        '<span class="input-unit">kg</span>'
+        "</div>"
+        '<div class="cow-meta">'
+        f'性別: <b>{cow["性別"]}</b> ｜ 日齢: <b>{cow["日齢"]}日</b> ｜ 父:'
+        f' <b>{cow["父"]}</b>'
+        "</div>"
+        "</div>"
+        "</div>"
+    )
+    st.markdown(card_html_w, unsafe_allow_html=True)
+
+    with st.container(key="negative_factors_area_w"):
+      current_negs = cow.get("マイナス要素", [])
+      selected_negs = st.pills(
+          "マイナス要素（該当する場合のみ選択）",
+          options=NEGATIVE_FACTORS,
+          selection_mode="multi",
+          default=[f for f in current_negs if f in NEGATIVE_FACTORS],
+          key=f"neg_pills_{st.session_state.reset_ver}_{idx}",
+          label_visibility="collapsed",
+      )
+      new_negs = (
+          [f for f in NEGATIVE_FACTORS if f in selected_negs]
+          if selected_negs
+          else []
+      )
+      if set(new_negs) != set(current_negs):
+        st.session_state.cows[idx]["マイナス要素"] = new_negs
         save_backup()
-        st.rerun()
-      if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
-        st.session_state.input_buffer_w += "0"
-        st.rerun()
-      if cols_bottom[2].button(
-          "決定", key="btn_w_enter", use_container_width=True
-      ):
-        if st.session_state.input_buffer_w:
-          st.session_state.cows[idx]["体重"] = float(
-              st.session_state.input_buffer_w
-          )
+
+    with st.container(key="numpad_area_w"):
+      col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
+
+      with col_l:
+        if st.button("←", key="prev_w", use_container_width=True):
+          if st.session_state.input_buffer_w:
+            st.session_state.cows[idx]["体重"] = float(
+                st.session_state.input_buffer_w
+            )
+            st.session_state.metrics_dirty = True
+            save_backup()
+          st.session_state.curr_idx_w = max(0, idx - 1)
+          st.session_state.input_buffer_w = ""
+          st.rerun()
+
+      with col_r:
+        with st.container(key="numpad_right_w"):
+          if st.button("BS", key="ce_w", use_container_width=True):
+            st.session_state.input_buffer_w = st.session_state.input_buffer_w[:-1]
+            st.rerun(scope="fragment")
+
+          if st.button("→", key="next_w", use_container_width=True):
+            if st.session_state.input_buffer_w:
+              st.session_state.cows[idx]["体重"] = float(
+                  st.session_state.input_buffer_w
+              )
+              st.session_state.metrics_dirty = True
+              save_backup()
+            st.session_state.curr_idx_w = min(total - 1, idx + 1)
+            st.session_state.input_buffer_w = ""
+            st.rerun()
+
+      with col_pad:
+        for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
+          cols = st.columns(3)
+          for i, num in enumerate(row_nums):
+            if cols[i].button(num, key=f"btn_w_{num}", use_container_width=True):
+              st.session_state.input_buffer_w += num
+              st.rerun(scope="fragment")
+        cols_bottom = st.columns(3)
+        if cols_bottom[0].button("C", key="btn_w_c", use_container_width=True):
+          st.session_state.input_buffer_w = ""
+          st.session_state.cows[idx]["体重"] = 0
           st.session_state.metrics_dirty = True
           save_backup()
-        st.session_state.input_buffer_w = ""
-        st.rerun()
+          st.rerun()
+        if cols_bottom[1].button("0", key="btn_w_0", use_container_width=True):
+          st.session_state.input_buffer_w += "0"
+          st.rerun(scope="fragment")
+        if cols_bottom[2].button(
+            "決定", key="btn_w_enter", use_container_width=True
+        ):
+          if st.session_state.input_buffer_w:
+            st.session_state.cows[idx]["体重"] = float(
+                st.session_state.input_buffer_w
+            )
+            st.session_state.metrics_dirty = True
+            save_backup()
+          st.session_state.input_buffer_w = ""
+          st.rerun()
+
+
+with tab2:
+  _render_tab2()
 
 
 # =========================================================
 # 画面3: 落札価格入力画面（セリ本番）
 # =========================================================
-with tab3:
-  total = len(st.session_state.cows)
-  idx = st.session_state.curr_idx_p
-  cow = st.session_state.cows[idx]
+@st.fragment
+def _render_tab3():
+    total = len(st.session_state.cows)
+    idx = st.session_state.curr_idx_p
+    cow = st.session_state.cows[idx]
 
-  # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
-  avg_unit_price = calculate_average_unit_price()
+    # kg単価の平均値を取得（累計変数による高速化 ＋ 0円自動除外）
+    avg_unit_price = calculate_average_unit_price()
 
-  calc = calculate_cow_metrics(cow)
+    calc = calculate_cow_metrics(cow)
 
-  # モードに応じた表示の切り替えと、未入力時のハイフン処理
-  if st.session_state.p_mode == "price":
-      display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-")
-      display_b = str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-"
-      active_price_class = "active-input"
-      active_buyer_class = ""
-  else:
-      display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-"
-      display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-")
-      active_price_class = ""
-      active_buyer_class = "active-input"
+    # モードに応じた表示の切り替えと、未入力時のハイフン処理
+    if st.session_state.p_mode == "price":
+        display_p = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-")
+        display_b = str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-"
+        active_price_class = "active-input"
+        active_buyer_class = ""
+    else:
+        display_p = str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "-"
+        display_b = st.session_state.input_buffer_p if st.session_state.input_buffer_p != "" else (str(cow.get("落札者番号", "")) if str(cow.get("落札者番号", "")) != "" else "-")
+        active_price_class = ""
+        active_buyer_class = "active-input"
 
-  neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
-  neg_badges_html = "".join(
-      f'<span class="neg-badge">{n}</span>' for n in neg_factors
-  )
-
-  with st.container(key="no_jump_p"):
-    with st.popover(f"No.{cow['No']} ✎"):
-      nos = [c["No"] for c in st.session_state.cows]
-      target_no = st.number_input(
-          "出場番号を入力して移動",
-          min_value=int(min(nos)),
-          max_value=int(max(nos)),
-          value=int(cow["No"]),
-          step=1,
-          key=f"jump_no_p_{idx}",
-      )
-      if st.button(
-          "この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True
-      ):
-        target_idx = next(
-            (
-                i
-                for i, c in enumerate(st.session_state.cows)
-                if c["No"] == target_no
-            ),
-            None,
-        )
-        if target_idx is not None:
-          # 移動前に今の状態を保存してモードをリセット
-          if st.session_state.input_buffer_p:
-            if st.session_state.p_mode == "price":
-                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.metrics_dirty = True
-            else:
-                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-            save_backup()
-          st.session_state.p_mode = "price"
-          st.session_state.curr_idx_p = target_idx
-          st.session_state.input_buffer_p = ""
-          st.rerun()
-        else:
-          st.warning("その出場番号は見つかりませんでした。")
-
-  try:
-    price_for_unit = int(cow["実際落札額"])
-  except (ValueError, TypeError):
-    price_for_unit = 0
-  try:
-    weight_for_unit = float(cow["体重"])
-  except (ValueError, TypeError):
-    weight_for_unit = 0
-  unit_price = (
-      int(round(price_for_unit * 1000 / weight_for_unit))
-      if weight_for_unit > 0 and price_for_unit > 0
-      else 0
-  )
-  unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
-
-  # 画面3専用のインラインスタイルで下の余白をゼロにする
-  card_html_p = (
-      '<div class="screen-card" style="margin-bottom: 0px !important;">'
-      '<div class="card-top">'
-      '<div class="cow-top-row">'
-      '<div class="cow-info-col cow-meta">'
-      f'日齢: <b>{cow["日齢"]}日</b><br>'
-      f'体重: <b>{cow["体重"]}kg</b><br>'
-      f'父: <b>{cow["父"]}</b><br>'
-      f'DG: <b>{calc["DG"]}kg/日</b><br>'
-      f"kg単価:<br><b>{unit_price_text}</b><br>"
-      f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
-      "</div>"
-      f'<div class="cow-icon-col">{get_cow_svg(cow["No"])}</div>'
-      f'<div class="cow-neg-col">{neg_badges_html}</div>'
-      "</div>"
-      '<div class="cow-metrics">'
-      f'落札牛平均kg単価 <span class="profit">{avg_unit_price:,}</span>(円/kg)<br>'
-      f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
-      f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
-      "</div>"
-      "</div>"
-      "</div>"
-  )
-  st.markdown(card_html_p, unsafe_allow_html=True)
-
-  # --- 🔴 画面3専用：アクティブな入力モードを強調する動的CSS ---
-  active_css = f"""
-  <style>
-  .st-key-btn_switch_{st.session_state.p_mode} button {{
-      border: 2px solid #f97316 !important;
-      border-bottom: 4px solid #f97316 !important;
-      background-color: #fff7ed !important;
-      color: #ea580c !important;
-  }}
-  </style>
-  """
-  st.markdown(active_css, unsafe_allow_html=True)
-
-  # --- タップで切り替え可能な新しい入力エリア ---
-  with st.container(key="mode_switch_area"):
-      col_p, col_b = st.columns(2)
-      with col_p:
-          if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
-              if st.session_state.p_mode != "price":
-                  # 購買者番号モードから戻る際、入力途中のデータがあれば保存
-                  if st.session_state.input_buffer_p:
-                      st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-                      save_backup()
-                  st.session_state.input_buffer_p = ""
-                  st.session_state.p_mode = "price"
-                  st.rerun()
-
-      with col_b:
-          if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
-              if st.session_state.p_mode != "buyer":
-                  # 落札額モードから切り替える際、入力途中のデータがあれば保存
-                  if st.session_state.input_buffer_p:
-                      st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                      st.session_state.metrics_dirty = True
-                      save_backup()
-                  st.session_state.input_buffer_p = ""
-                  st.session_state.p_mode = "buyer"
-                  st.rerun()
-
-  with st.container(key="purchase_check_area_p"):
-    purchased = st.checkbox(
-        "購入チェック",
-        value=cow["自社落札"],
-        key=f"buy_check_{st.session_state.reset_ver}_{idx}",
+    neg_factors = [f for f in NEGATIVE_FACTORS if f in cow.get("マイナス要素", [])]
+    neg_badges_html = "".join(
+        f'<span class="neg-badge">{n}</span>' for n in neg_factors
     )
-    if purchased != cow["自社落札"]:
-      st.session_state.cows[idx]["自社落札"] = purchased
-      st.session_state.metrics_dirty = True
-      save_backup()
 
-  with st.container(key="numpad_area_p"):
-    col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
-
-    with col_l:
-      if st.button("←", key="prev_p", use_container_width=True):
-        if st.session_state.input_buffer_p:
-          if st.session_state.p_mode == "price":
-              st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-              st.session_state.metrics_dirty = True
+    with st.container(key="no_jump_p"):
+      with st.popover(f"No.{cow['No']} ✎"):
+        nos = [c["No"] for c in st.session_state.cows]
+        target_no = st.number_input(
+            "出場番号を入力して移動",
+            min_value=int(min(nos)),
+            max_value=int(max(nos)),
+            value=int(cow["No"]),
+            step=1,
+            key=f"jump_no_p_{idx}",
+        )
+        if st.button(
+            "この番号へ移動", key=f"jump_go_p_{idx}", use_container_width=True
+        ):
+          target_idx = next(
+              (
+                  i
+                  for i, c in enumerate(st.session_state.cows)
+                  if c["No"] == target_no
+              ),
+              None,
+          )
+          if target_idx is not None:
+            # 移動前に今の状態を保存してモードをリセット
+            if st.session_state.input_buffer_p:
+              if st.session_state.p_mode == "price":
+                  st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                  st.session_state.metrics_dirty = True
+              else:
+                  st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+              save_backup()
+            st.session_state.p_mode = "price"
+            st.session_state.curr_idx_p = target_idx
+            st.session_state.input_buffer_p = ""
+            st.rerun()
           else:
-              st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-          save_backup()
-        st.session_state.curr_idx_p = max(0, idx - 1)
-        st.session_state.input_buffer_p = ""
-        st.session_state.p_mode = "price" # 常に落札額入力からスタート
-        st.rerun()
+            st.warning("その出場番号は見つかりませんでした。")
 
-    with col_r:
-      with st.container(key="numpad_right_p"):
-        if st.button("BS", key="ce_p", use_container_width=True):
-          st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
-          st.rerun()
+    try:
+      price_for_unit = int(cow["実際落札額"])
+    except (ValueError, TypeError):
+      price_for_unit = 0
+    try:
+      weight_for_unit = float(cow["体重"])
+    except (ValueError, TypeError):
+      weight_for_unit = 0
+    unit_price = (
+        int(round(price_for_unit * 1000 / weight_for_unit))
+        if weight_for_unit > 0 and price_for_unit > 0
+        else 0
+    )
+    unit_price_text = f"{unit_price:,}円/kg" if unit_price > 0 else "-"
 
-        if st.button("→", key="next_p", use_container_width=True):
+    # 画面3専用のインラインスタイルで下の余白をゼロにする
+    card_html_p = (
+        '<div class="screen-card" style="margin-bottom: 0px !important;">'
+        '<div class="card-top">'
+        '<div class="cow-top-row">'
+        '<div class="cow-info-col cow-meta">'
+        f'日齢: <b>{cow["日齢"]}日</b><br>'
+        f'体重: <b>{cow["体重"]}kg</b><br>'
+        f'父: <b>{cow["父"]}</b><br>'
+        f'DG: <b>{calc["DG"]}kg/日</b><br>'
+        f"kg単価:<br><b>{unit_price_text}</b><br>"
+        f'摘要: <b>{cow.get("摘要", "") or "-"}</b>'
+        "</div>"
+        f'<div class="cow-icon-col">{get_cow_svg(cow["No"])}</div>'
+        f'<div class="cow-neg-col">{neg_badges_html}</div>'
+        "</div>"
+        '<div class="cow-metrics">'
+        f'落札牛平均kg単価 <span class="profit">{avg_unit_price:,}</span>(円/kg)<br>'
+        f'損益分岐点 <span class="border-price">{calc["ボーダー価格"]}</span>(千円)<br>'
+        f'目標落札額 <span class="target-price">{calc["目標落札額"]}</span>(千円)'
+        "</div>"
+        "</div>"
+        "</div>"
+    )
+    st.markdown(card_html_p, unsafe_allow_html=True)
+
+    # --- 🔴 画面3専用：アクティブな入力モードを強調する動的CSS ---
+    active_css = f"""
+    <style>
+    .st-key-btn_switch_{st.session_state.p_mode} button {{
+        border: 2px solid #f97316 !important;
+        border-bottom: 4px solid #f97316 !important;
+        background-color: #fff7ed !important;
+        color: #ea580c !important;
+    }}
+    </style>
+    """
+    st.markdown(active_css, unsafe_allow_html=True)
+
+    # --- タップで切り替え可能な新しい入力エリア ---
+    with st.container(key="mode_switch_area"):
+        col_p, col_b = st.columns(2)
+        with col_p:
+            if st.button(f"額: {display_p} 千円", key="btn_switch_price", use_container_width=True):
+                if st.session_state.p_mode != "price":
+                    # 購買者番号モードから戻る際、入力途中のデータがあれば保存
+                    if st.session_state.input_buffer_p:
+                        st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+                        save_backup()
+                    st.session_state.input_buffer_p = ""
+                    st.session_state.p_mode = "price"
+                    st.rerun()
+
+        with col_b:
+            if st.button(f"購買No: {display_b}", key="btn_switch_buyer", use_container_width=True):
+                if st.session_state.p_mode != "buyer":
+                    # 落札額モードから切り替える際、入力途中のデータがあれば保存
+                    if st.session_state.input_buffer_p:
+                        st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                        st.session_state.metrics_dirty = True
+                        save_backup()
+                    st.session_state.input_buffer_p = ""
+                    st.session_state.p_mode = "buyer"
+                    st.rerun()
+
+    with st.container(key="purchase_check_area_p"):
+      purchased = st.checkbox(
+          "購入チェック",
+          value=cow["自社落札"],
+          key=f"buy_check_{st.session_state.reset_ver}_{idx}",
+      )
+      if purchased != cow["自社落札"]:
+        st.session_state.cows[idx]["自社落札"] = purchased
+        st.session_state.metrics_dirty = True
+        save_backup()
+
+    with st.container(key="numpad_area_p"):
+      col_l, col_pad, col_r = st.columns([0.8, 4.6, 0.8])
+
+      with col_l:
+        if st.button("←", key="prev_p", use_container_width=True):
           if st.session_state.input_buffer_p:
             if st.session_state.p_mode == "price":
                 st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
@@ -1445,48 +1432,71 @@ with tab3:
             else:
                 st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
             save_backup()
-          st.session_state.curr_idx_p = min(total - 1, idx + 1)
+          st.session_state.curr_idx_p = max(0, idx - 1)
           st.session_state.input_buffer_p = ""
           st.session_state.p_mode = "price" # 常に落札額入力からスタート
           st.rerun()
 
-    with col_pad:
-      for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
-        cols = st.columns(3)
-        for i, num in enumerate(row_nums):
-          if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
-            st.session_state.input_buffer_p += num
-            st.rerun()
-      cols_bottom = st.columns(3)
-      if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
-        st.session_state.input_buffer_p = ""
-        if st.session_state.p_mode == "price":
-            st.session_state.cows[idx]["実際落札額"] = 0
-            st.session_state.metrics_dirty = True
-        else:
-            st.session_state.cows[idx]["落札者番号"] = ""
-        save_backup()
-        st.rerun()
-      if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
-        st.session_state.input_buffer_p += "0"
-        st.rerun()
-      
-      if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
-        if st.session_state.p_mode == "price":
+      with col_r:
+        with st.container(key="numpad_right_p"):
+          if st.button("BS", key="ce_p", use_container_width=True):
+            st.session_state.input_buffer_p = st.session_state.input_buffer_p[:-1]
+            st.rerun(scope="fragment")
+
+          if st.button("→", key="next_p", use_container_width=True):
             if st.session_state.input_buffer_p:
-                st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
-                st.session_state.metrics_dirty = True
-                save_backup()
+              if st.session_state.p_mode == "price":
+                  st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                  st.session_state.metrics_dirty = True
+              else:
+                  st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+              save_backup()
+            st.session_state.curr_idx_p = min(total - 1, idx + 1)
             st.session_state.input_buffer_p = ""
-            st.session_state.p_mode = "buyer" # 決定後、落札者番号モードへ移行
+            st.session_state.p_mode = "price" # 常に落札額入力からスタート
             st.rerun()
-        else: # buyerモードの場合
-            if st.session_state.input_buffer_p:
-                st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
-                save_backup()
-            st.session_state.input_buffer_p = ""
-            st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
-            st.rerun()
+
+      with col_pad:
+        for row_nums in [["7", "8", "9"], ["4", "5", "6"], ["1", "2", "3"]]:
+          cols = st.columns(3)
+          for i, num in enumerate(row_nums):
+            if cols[i].button(num, key=f"btn_p_{num}", use_container_width=True):
+              st.session_state.input_buffer_p += num
+              st.rerun(scope="fragment")
+        cols_bottom = st.columns(3)
+        if cols_bottom[0].button("C", key="btn_p_c", use_container_width=True):
+          st.session_state.input_buffer_p = ""
+          if st.session_state.p_mode == "price":
+              st.session_state.cows[idx]["実際落札額"] = 0
+              st.session_state.metrics_dirty = True
+          else:
+              st.session_state.cows[idx]["落札者番号"] = ""
+          save_backup()
+          st.rerun()
+        if cols_bottom[1].button("0", key="btn_p_0", use_container_width=True):
+          st.session_state.input_buffer_p += "0"
+          st.rerun(scope="fragment")
+
+        if cols_bottom[2].button("決定", key="btn_p_enter", use_container_width=True):
+          if st.session_state.p_mode == "price":
+              if st.session_state.input_buffer_p:
+                  st.session_state.cows[idx]["実際落札額"] = int(st.session_state.input_buffer_p)
+                  st.session_state.metrics_dirty = True
+                  save_backup()
+              st.session_state.input_buffer_p = ""
+              st.session_state.p_mode = "buyer" # 決定後、落札者番号モードへ移行
+              st.rerun()
+          else: # buyerモードの場合
+              if st.session_state.input_buffer_p:
+                  st.session_state.cows[idx]["落札者番号"] = st.session_state.input_buffer_p
+                  save_backup()
+              st.session_state.input_buffer_p = ""
+              st.session_state.p_mode = "price" # モードをリセットする（遷移はしない）
+              st.rerun()
+
+
+with tab3:
+  _render_tab3()
 
 
 # =========================================================
