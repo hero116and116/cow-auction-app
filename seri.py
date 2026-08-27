@@ -588,10 +588,39 @@ st.markdown(
 )
 
 # --- APIキー & kintone設定 ---
-GEMINI_API_KEY = "AQ.Ab8RN6KGaI97aQ0liR_8kYw5ALr-SMS8KzDW8cPaMUnlt4veDQ"
-KINTONE_DOMAIN = "cattlook.cybozu.com"
-KINTONE_APP_ID = "131"
-KINTONE_API_TOKEN = "T4aTJyzRN736eaqzzWucxZIIbXy9wYn5YkAnlJsO"
+# セキュリティのため、キー類はソースコードに直書きせず st.secrets（.streamlit/secrets.toml
+# または Streamlit Community Cloud の Secrets 設定）から読み込む。
+# ローカル開発時は環境変数からのフォールバックも用意。
+def _get_secret(key, env_fallback=None, default=""):
+  try:
+    if key in st.secrets:
+      return st.secrets[key]
+  except Exception:
+    pass
+  return os.environ.get(env_fallback or key, default)
+
+
+GEMINI_API_KEY = _get_secret("GEMINI_API_KEY")
+KINTONE_DOMAIN = _get_secret("KINTONE_DOMAIN", default="cattlook.cybozu.com")
+KINTONE_APP_ID = _get_secret("KINTONE_APP_ID", default="131")
+KINTONE_API_TOKEN = _get_secret("KINTONE_API_TOKEN")
+
+_MISSING_SECRETS = [
+    name
+    for name, val in [
+        ("GEMINI_API_KEY", GEMINI_API_KEY),
+        ("KINTONE_API_TOKEN", KINTONE_API_TOKEN),
+    ]
+    if not val
+]
+if _MISSING_SECRETS:
+  st.error(
+      "⚠️ 必要な設定が見つかりません: "
+      f"{', '.join(_MISSING_SECRETS)}\n\n"
+      ".streamlit/secrets.toml（ローカル）または Streamlit Cloud の"
+      " Secrets設定に追加してください。"
+  )
+  st.stop()
 
 # --- サイドバー開閉状態 ---
 if "sidebar_open" not in st.session_state:

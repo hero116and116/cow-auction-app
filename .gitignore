@@ -1,0 +1,11 @@
+# APIキー等の秘匿情報（絶対にコミットしない）
+.streamlit/secrets.toml
+
+# アプリの自動バックアップ（セリの実データが入るため）
+backup_cows.json
+
+# Python関連
+__pycache__/
+*.pyc
+.venv/
+venv/Secrets.toml
