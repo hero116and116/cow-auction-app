@@ -1,6 +1,7 @@
 import json
 import os
 import textwrap
+import uuid
 from google import genai
 from google.genai import types
 import numpy as np
@@ -403,26 +404,35 @@ NEGATIVE_FACTORS = [
 ]
 
 # --- 自動バックアップ管理 ---
-BACKUP_FILE = "backup_cows.json"
+# URLパラメータにIDがあれば引き継ぎ、無ければ新規生成してURLに付与
+if "session_id" not in st.session_state:
+    if "session_id" in st.query_params:
+        st.session_state.session_id = st.query_params["session_id"]
+    else:
+        new_id = str(uuid.uuid4())[:8]
+        st.session_state.session_id = new_id
+        st.query_params["session_id"] = new_id
 
+def get_backup_file():
+    """現在のセッション専用のバックアップファイル名を返す"""
+    return f"backup_cows_{st.session_state.session_id}.json"
 
 def save_backup():
   """現在のセリデータをJSONファイルに自動保存"""
   try:
-    with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+    with open(get_backup_file(), "w", encoding="utf-8") as f:
       json.dump(st.session_state.cows, f, ensure_ascii=False, indent=2)
   except Exception:
     pass
 
-
 def clear_backup():
   """バックアップファイルを削除（初期化用）"""
-  if os.path.exists(BACKUP_FILE):
+  file_path = get_backup_file()
+  if os.path.exists(file_path):
     try:
-      os.remove(BACKUP_FILE)
+      os.remove(file_path)
     except Exception:
       pass
-
 
 # --- カスタムCSS ---
 st.markdown(
@@ -1158,9 +1168,10 @@ def send_to_kintone(cows_list):
 
 # --- セッションステート初期化 ---
 if "cows" not in st.session_state:
-  if os.path.exists(BACKUP_FILE):
+  backup_file = get_backup_file()
+  if os.path.exists(backup_file):
     try:
-      with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+      with open(backup_file, "r", encoding="utf-8") as f:
         st.session_state.cows = json.load(f)
         for c in st.session_state.cows:
             if "落札者番号" not in c:
