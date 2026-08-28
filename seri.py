@@ -1219,6 +1219,8 @@ if "metrics_dirty" not in st.session_state:
   st.session_state.metrics_dirty = True
 if "reset_ver" not in st.session_state:
   st.session_state.reset_ver = 0
+if "popover_ver" not in st.session_state:
+    st.session_state.popover_ver = 0
 
 def get_cow_svg(number_str):
   html = f"""<div class="cow-icon-container">
@@ -1331,7 +1333,7 @@ with tab2:
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
 
-  with st.container(key="no_jump_w"):
+  with st.container(key=f"no_jump_w_{st.session_state.popover_ver}"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
@@ -1346,6 +1348,7 @@ with tab2:
         target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
         if target_idx is not None:
           st.session_state.curr_idx_w = target_idx
+          st.session_state.popover_ver += 1
           st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
@@ -1424,7 +1427,7 @@ with tab3:
       f'<span class="neg-badge">{n}</span>' for n in neg_factors
   )
 
-  with st.container(key="no_jump_p"):
+  with st.container(key=f"no_jump_p_{st.session_state.popover_ver}"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
@@ -1439,6 +1442,7 @@ with tab3:
         target_idx = next((i for i, c in enumerate(st.session_state.cows) if c["No"] == target_no), None)
         if target_idx is not None:
           st.session_state.curr_idx_p = target_idx
+          st.session_state.popover_ver += 1
           st.rerun()
         else:
           st.warning("その出場番号は見つかりませんでした。")
