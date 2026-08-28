@@ -596,12 +596,12 @@ st.markdown(
         word-break: keep-all;
     }
 
-    .st-key-no_jump_w, .st-key-no_jump_p {
+    div[class*="st-key-no_jump_w_"], div[class*="st-key-no_jump_p_"] {
         display: flex;
         justify-content: center;
         margin-bottom: 4px;
     }
-    .st-key-no_jump_w button, .st-key-no_jump_p button {
+    div[class*="st-key-no_jump_w_"] button, div[class*="st-key-no_jump_p_"] button {
         font-size: 18px !important;
         font-weight: 800 !important;
         color: #1e293b !important;
@@ -610,7 +610,7 @@ st.markdown(
         border-radius: 6px !important;
         padding: 4px 14px !important;
     }
-    .st-key-no_jump_w button:hover, .st-key-no_jump_p button:hover {
+    div[class*="st-key-no_jump_w_"] button:hover, div[class*="st-key-no_jump_p_"] button:hover {
         border-color: #3b82f6 !important;
         color: #3b82f6 !important;
     }
@@ -1331,7 +1331,7 @@ with tab2:
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
 
-  with st.container(key="no_jump_w"):
+  with st.container(key=f"no_jump_w_{idx}"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
@@ -1424,7 +1424,7 @@ with tab3:
       f'<span class="neg-badge">{n}</span>' for n in neg_factors
   )
 
-  with st.container(key="no_jump_p"):
+  with st.container(key=f"no_jump_p_{idx}"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
