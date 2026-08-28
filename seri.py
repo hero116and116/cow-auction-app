@@ -596,12 +596,12 @@ st.markdown(
         word-break: keep-all;
     }
 
-    div[class*="st-key-no_jump_w_"], div[class*="st-key-no_jump_p_"] {
+    .st-key-no_jump_w, .st-key-no_jump_p {
         display: flex;
         justify-content: center;
         margin-bottom: 4px;
     }
-    div[class*="st-key-no_jump_w_"] button, div[class*="st-key-no_jump_p_"] button {
+    .st-key-no_jump_w button, .st-key-no_jump_p button {
         font-size: 18px !important;
         font-weight: 800 !important;
         color: #1e293b !important;
@@ -610,7 +610,7 @@ st.markdown(
         border-radius: 6px !important;
         padding: 4px 14px !important;
     }
-    div[class*="st-key-no_jump_w_"] button:hover, div[class*="st-key-no_jump_p_"] button:hover {
+    .st-key-no_jump_w button:hover, .st-key-no_jump_p button:hover {
         border-color: #3b82f6 !important;
         color: #3b82f6 !important;
     }
@@ -1331,7 +1331,7 @@ with tab2:
   idx = st.session_state.curr_idx_w
   cow = st.session_state.cows[idx]
 
-  with st.container(key=f"no_jump_w_{idx}"):
+  with st.container(key="no_jump_w"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
@@ -1424,7 +1424,7 @@ with tab3:
       f'<span class="neg-badge">{n}</span>' for n in neg_factors
   )
 
-  with st.container(key=f"no_jump_p_{idx}"):
+  with st.container(key="no_jump_p"):
     with st.popover(f"No.{cow['No']} ✎"):
       nos = [c["No"] for c in st.session_state.cows]
       target_no = st.number_input(
@@ -1552,18 +1552,15 @@ with tab4:
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
     import altair as alt
 
-    # 折れ線グラフ
+    # 固定の縦軸範囲を設けず、平均は緑の水平点線で重ねる。
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
-        y=alt.Y("kg単価(円):Q", title="kg単価（円）", scale=alt.Scale(domain=[1500, 3500])),
+        y=alt.Y("kg単価(円):Q", title="kg単価（円）"),
         tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
     )
-    
-    # 平均線（データ名を親グラフと一致させる）
-    average_rule = alt.Chart(pd.DataFrame({"kg単価(円)": [avg_kp]})).mark_rule(
+    average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
         color="#16a34a", strokeDash=[6, 4], strokeWidth=3
-    ).encode(y="kg単価(円):Q")
-    
+    ).encode(y="平均kg単価:Q")
     st.altair_chart(
         alt.layer(line_chart, average_rule).properties(height=300),
         use_container_width=True,
