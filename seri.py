@@ -1558,13 +1558,14 @@ with tab4:
         y=alt.Y("kg単価(円):Q", title="kg単価（円）", scale=alt.Scale(domain=[1500, 3500])),
         tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
     )
-    average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
-        color="#16a34a", strokeDash=[6, 4], strokeWidth=3
-    ).encode(y="平均kg単価:Q")
+  average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
+      color="#16a34a", strokeDash=[6, 4], strokeWidth=3
+).encode(y=alt.Y("平均kg単価:Q", scale=alt.Scale(domain=[1500, 3500])))
     st.altair_chart(
         alt.layer(line_chart, average_rule).properties(height=300),
         use_container_width=True,
     )
+
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
