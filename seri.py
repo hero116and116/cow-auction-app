@@ -1,7 +1,6 @@
 import json
 import os
 import textwrap
-import uuid
 from google import genai
 from google.genai import types
 import numpy as np
@@ -122,9 +121,6 @@ COMPONENT_HTML = """
   <div id="app"></div>
   <script>
     // --- Streamlitコンポーネント通信の自前実装 ---
-    // 外部CDN(jsdelivr)への依存をなくし、電波が弱い環境でも
-    // コンポーネントの読み込みが失敗しないようにするための最小限の実装。
-    // streamlit-component-lib が使うpostMessageプロトコルを直接扱う。
     window.Streamlit = (function () {
       const RENDER_EVENT = "streamlit:render";
       const target = new EventTarget();
@@ -255,7 +251,6 @@ COMPONENT_HTML = """
 
     function onRender(event) {
       const args = event.detail.args;
-      // Python側から「新しい牛になった」合図が来たらバッファをリセット
       if (renderKey !== args.render_key) {
         renderKey = args.render_key;
         mode = args.mode;
@@ -275,8 +270,6 @@ COMPONENT_HTML = """
 </html>
 """
 
-# V1 の declare_component は iframe 用アセット URL を別途読み込む。プロキシ配下で
-# その URL が失敗するため、HTML / CSS / JS をアプリ本文に直接マウントする V2 を使う。
 NUMPAD_HTML = '<div id="numpad-app"></div>'
 NUMPAD_CSS = """
 #numpad-app { padding-top: 4px; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
@@ -322,12 +315,48 @@ custom_numpad = st.components.v2.component(
     "inline_numpad", html=NUMPAD_HTML, css=NUMPAD_CSS, js=NUMPAD_JS
 )
 
+# --- 端末IDの永続化コンポーネント (LocalStorage) ---
+DEVICE_ID_HTML = '<div style="display:none;"></div>'
+DEVICE_ID_JS = """
+export default function(component) {
+  let deviceId = localStorage.getItem("seri_device_id");
+  if (!deviceId) {
+    deviceId = "dev_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("seri_device_id", deviceId);
+  }
+  if (component.data.known_id !== deviceId) {
+    component.setTriggerValue('submit', deviceId);
+  }
+}
+"""
+device_id_manager = st.components.v2.component(
+    "device_id_manager", html=DEVICE_ID_HTML, js=DEVICE_ID_JS
+)
 
 st.set_page_config(
     page_title="かう(セリのボーダー計算、結果保存アプリ)",
     page_icon="🐄",
     layout="centered",
 )
+
+if "device_id" not in st.session_state:
+    st.session_state.device_id = None
+
+# JSを実行して端末からIDを読み出し
+dev_res = device_id_manager(
+    key="dev_id_mgr",
+    data={"known_id": st.session_state.device_id}
+)
+
+dev_id_val = getattr(dev_res, "submit", None)
+if dev_id_val:
+    if st.session_state.device_id != dev_id_val:
+        st.session_state.device_id = dev_id_val
+        st.rerun()
+
+# 端末IDが取得できるまでの数ミリ秒だけ描画を待機
+if not st.session_state.device_id:
+    st.stop()
 
 # --- 通信切断検知バナー ---
 _DISCONNECT_WATCHER_HTML = r"""
@@ -404,18 +433,9 @@ NEGATIVE_FACTORS = [
 ]
 
 # --- 自動バックアップ管理 ---
-# URLパラメータにIDがあれば引き継ぎ、無ければ新規生成してURLに付与
-if "session_id" not in st.session_state:
-    if "session_id" in st.query_params:
-        st.session_state.session_id = st.query_params["session_id"]
-    else:
-        new_id = str(uuid.uuid4())[:8]
-        st.session_state.session_id = new_id
-        st.query_params["session_id"] = new_id
-
 def get_backup_file():
-    """現在のセッション専用のバックアップファイル名を返す"""
-    return f"backup_cows_{st.session_state.session_id}.json"
+    """現在の端末専用のバックアップファイル名を返す"""
+    return f"backup_cows_{st.session_state.device_id}.json"
 
 def save_backup():
   """現在のセリデータをJSONファイルに自動保存"""
@@ -456,7 +476,6 @@ st.markdown(
         white-space: nowrap !important;
     }
 
-    /* 👇元の16pxに完全に戻しました（画面2への影響をなくすため） */
     .screen-card {
         border: 2px solid #1e293b;
         border-radius: 4px;
@@ -499,7 +518,6 @@ st.markdown(
         text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
     }
 
-    /* 落札価格入力画面：3カラム横並び */
     .cow-top-row {
         display: flex;
         align-items: center;
@@ -565,7 +583,6 @@ st.markdown(
         overflow: hidden;
     }
     
-    /* 画面3用の特別なアクティブクラス (画面2には影響しません) */
     .active-input {
         border-bottom: 4px solid #f97316 !important;
         background-color: #fff7ed !important;
@@ -771,8 +788,6 @@ st.markdown(
         margin-top: 0 !important;
     }
     
-    /* 🔴 スマホでの「額／番号」ボタン横並び強制設定と隙間埋め */
-    /* 👇 マイナスマージンを調整した*/
     .st-key-mode_switch_area {
         margin-top: -26px !important; 
     }
@@ -786,9 +801,8 @@ st.markdown(
         width: 50% !important;
         min-width: 0 !important;
     }
-    /* ボタンの枠のサイズ設定 */
     .st-key-btn_switch_price button, .st-key-btn_switch_buyer button {
-        height: 70px !important; /* 文字に合わせて枠も少し大きくしました */
+        height: 70px !important;
         background-color: #f8fafc !important;
         border: 2px solid #e2e8f0 !important;
         border-radius: 8px !important;
@@ -797,9 +811,8 @@ st.markdown(
         margin-bottom: 8px !important;
     }
     
-    /* 👇 ボタンの中の「文字」を直接指定して強制的に大きくする */
     .st-key-btn_switch_price button p, .st-key-btn_switch_buyer button p {
-        font-size: 24px !important;  /* ここで文字の大きさを変えられます */
+        font-size: 24px !important;
         font-weight: 900 !important;
         margin: 0 !important;
     }
@@ -1567,17 +1580,16 @@ with tab4:
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
     import altair as alt
 
-    # 🔴 修正点: 2つのグラフで設定が衝突しないよう、Y軸のルールを1つの変数にまとめます
     shared_y = alt.Y(
         "kg単価(円):Q", 
         title="kg単価（円）", 
-        scale=alt.Scale(domain=[1500, 3500], clamp=True) # clamp=Trueで範囲外の点もエラーを出さずに枠の上下に留める
+        scale=alt.Scale(domain=[1500, 3500], clamp=True)
     )
 
     # 折れ線グラフ
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
-        y=shared_y, # 共通ルールを適用
+        y=shared_y,
         tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")]
     )
 
@@ -1585,7 +1597,7 @@ with tab4:
     average_rule = alt.Chart(pd.DataFrame({"kg単価(円)": [avg_kp]})).mark_rule(
         color="#16a34a", strokeDash=[6, 4], strokeWidth=3
     ).encode(
-        y=shared_y # 折れ線グラフと全く同じ共通ルールを適用
+        y=shared_y
     )
 
     # グラフを重ね合わせて描画
