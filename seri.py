@@ -1555,7 +1555,7 @@ with tab4:
     # 固定の縦軸範囲を設けず、平均は緑の水平点線で重ねる。
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
-        y=alt.Y("kg単価(円):Q", title="kg単価（円）", scale=alt.Scale(domain=[1500, 3500])),
+        y=alt.Y("kg単価(円):Q", title="kg単価（円）"),
         tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
     )
     average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
