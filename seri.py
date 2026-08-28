@@ -1552,15 +1552,18 @@ with tab4:
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
     import altair as alt
 
-    # 固定の縦軸範囲を設けず、平均は緑の水平点線で重ねる。
+    # 折れ線グラフ
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
         y=alt.Y("kg単価(円):Q", title="kg単価（円）", scale=alt.Scale(domain=[1500, 3500])),
         tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
     )
-    average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
+    
+    # 平均線（データ名を親グラフと一致させる）
+    average_rule = alt.Chart(pd.DataFrame({"kg単価(円)": [avg_kp]})).mark_rule(
         color="#16a34a", strokeDash=[6, 4], strokeWidth=3
-    ).encode(y="平均kg単価:Q")
+    ).encode(y="kg単価(円):Q")
+    
     st.altair_chart(
         alt.layer(line_chart, average_rule).properties(height=300),
         use_container_width=True,
