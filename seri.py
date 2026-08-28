@@ -76,206 +76,6 @@ COW_ICON_B64 = (
 )
 
 # --- 🚀 究極の高速化：JavaScriptテンキーの生成 ---
-COMPONENT_HTML = """
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    body { margin: 0; padding: 4px 0 0 0; font-family: sans-serif; background: transparent; user-select: none; -webkit-user-select: none; }
-    .row { display: flex; gap: 6px; margin-bottom: 6px; }
-    button {
-        flex: 1; height: 72px; font-size: 28px; font-weight: 700;
-        border-radius: 4px; border: 1px solid #94a3b8; background-color: #ffffff;
-        color: #1e293b; cursor: pointer; padding: 0; touch-action: manipulation;
-    }
-    button:active { border-color: #3b82f6; color: #3b82f6; background-color: #f1f5f9; }
-    .btn-enter { background-color: #3b82f6; color: #ffffff; border-color: #3b82f6; }
-    .btn-c { background-color: #f1f5f9; color: #dc2626; }
-    .btn-ce { height: 72px; font-size: 16px; background-color: #fff7ed; color: #c2410c; margin-bottom: 6px; width: 100%;}
-    .btn-nav { font-size: 22px; width: 100%; }
-    .btn-next { height: 228px; }
-    .btn-prev { height: 306px; }
-
-    .display-row { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin-bottom: 12px; margin-top: 4px;}
-    .input-display {
-        font-size: 32px; font-weight: 800; color: #1e293b;
-        border-bottom: 2px solid #1e293b; display: inline-block;
-        min-width: 160px; height: 40px; line-height: 40px;
-        text-align: right; overflow: hidden; white-space: nowrap;
-    }
-    .input-unit { font-size: 18px; font-weight: 700; color: #1e293b; padding-bottom: 2px;}
-
-    .mode-switch { display: flex; gap: 6px; margin-bottom: 12px; margin-top: 4px; }
-    .mode-btn {
-        flex: 1; height: 70px; border-radius: 8px; font-size: 24px; font-weight: 900;
-        color: #475569; background: #f8fafc; border: 2px solid #e2e8f0; margin-bottom: 0;
-    }
-    .mode-btn.active {
-        border-color: #f97316; border-bottom: 4px solid #f97316; background-color: #fff7ed; color: #ea580c;
-    }
-  </style>
-</head>
-<body>
-  <div id="app"></div>
-  <script>
-    // --- Streamlitコンポーネント通信の自前実装 ---
-    // 外部CDN(jsdelivr)への依存をなくし、電波が弱い環境でも
-    // コンポーネントの読み込みが失敗しないようにするための最小限の実装。
-    // streamlit-component-lib が使うpostMessageプロトコルを直接扱う。
-    window.Streamlit = (function () {
-      const RENDER_EVENT = "streamlit:render";
-      const target = new EventTarget();
-      let lastHeight = null;
-
-      window.addEventListener("message", function (event) {
-        const data = event.data;
-        if (!data || data.type !== "streamlit:render") return;
-        target.dispatchEvent(new CustomEvent(RENDER_EVENT, { detail: data }));
-      });
-
-      function setComponentValue(value) {
-        window.parent.postMessage(
-            { type: "streamlit:setComponentValue", value: value, dataType: "json" },
-            "*"
-        );
-      }
-
-      function setFrameHeight(height) {
-        if (height === lastHeight) return;
-        lastHeight = height;
-        window.parent.postMessage(
-            { type: "streamlit:setFrameHeight", height: height },
-            "*"
-        );
-      }
-
-      function setComponentReady() {
-        window.parent.postMessage(
-            { type: "streamlit:componentReady", apiVersion: 1 },
-            "*"
-        );
-      }
-
-      return {
-        RENDER_EVENT: RENDER_EVENT,
-        events: target,
-        setComponentValue: setComponentValue,
-        setFrameHeight: setFrameHeight,
-        setComponentReady: setComponentReady
-      };
-    })();
-
-    let renderKey = "";
-    let mode = "";
-    let cowNo = -1;
-    let weightBuf = "";
-    let priceBuf = "";
-    let buyerBuf = "";
-    let activeInput = "price";
-
-    function sendData(action) {
-      Streamlit.setComponentValue({
-        action: action,
-        weight: weightBuf,
-        price: priceBuf,
-        buyer: buyerBuf
-      });
-    }
-
-    function appendNum(n) {
-      if (mode === "weight") weightBuf += n;
-      else if (activeInput === "price") priceBuf += n;
-      else buyerBuf += n;
-      renderUI();
-    }
-
-    function clearBuf() {
-      if (mode === "weight") weightBuf = "";
-      else if (activeInput === "price") priceBuf = "";
-      else buyerBuf = "";
-      renderUI();
-    }
-
-    function backspace() {
-      if (mode === "weight") weightBuf = weightBuf.slice(0, -1);
-      else if (activeInput === "price") priceBuf = priceBuf.slice(0, -1);
-      else buyerBuf = buyerBuf.slice(0, -1);
-      renderUI();
-    }
-
-    function handleEnter() {
-      if (mode === "price" && activeInput === "price") {
-        activeInput = "buyer"; // 額で決定を押したら、即座に購買No入力に切り替える（ノーラグ）
-        renderUI();
-      } else {
-        sendData("enter"); // それ以外はPythonにデータを送信して保存
-      }
-    }
-
-    function renderUI() {
-      const app = document.getElementById("app");
-      let html = "";
-
-      if (mode === "weight") {
-        const displayW = weightBuf !== "" ? weightBuf : "";
-        html += `<div class="display-row"><span class="input-display">${displayW}</span><span class="input-unit">kg</span></div>`;
-      } else {
-        const displayP = priceBuf !== "" ? priceBuf : "-";
-        const displayB = buyerBuf !== "" ? buyerBuf : "-";
-        html += `
-          <div class="mode-switch">
-            <button class="mode-btn ${activeInput==='price' ? 'active':''}" onclick="activeInput='price'; renderUI()">額: ${displayP} 千円</button>
-            <button class="mode-btn ${activeInput==='buyer' ? 'active':''}" onclick="activeInput='buyer'; renderUI()">購買No: ${displayB}</button>
-          </div>`;
-      }
-
-      html += `
-        <div style="display: flex; gap: 6px;">
-          <div style="flex: 0.8;">
-            <button class="btn-nav btn-prev" onclick="sendData('prev')">←</button>
-          </div>
-          <div style="flex: 4.6;">
-            <div class="row"><button onclick="appendNum('7')">7</button><button onclick="appendNum('8')">8</button><button onclick="appendNum('9')">9</button></div>
-            <div class="row"><button onclick="appendNum('4')">4</button><button onclick="appendNum('5')">5</button><button onclick="appendNum('6')">6</button></div>
-            <div class="row"><button onclick="appendNum('1')">1</button><button onclick="appendNum('2')">2</button><button onclick="appendNum('3')">3</button></div>
-            <div class="row" style="margin-bottom:0;"><button class="btn-c" onclick="clearBuf()">C</button><button onclick="appendNum('0')">0</button><button class="btn-enter" onclick="handleEnter()">決定</button></div>
-          </div>
-          <div style="flex: 0.8; display: flex; flex-direction: column;">
-            <button class="btn-ce" onclick="backspace()">BS</button>
-            <button class="btn-nav btn-next" onclick="sendData('next')">→</button>
-          </div>
-        </div>
-      `;
-      app.innerHTML = html;
-      Streamlit.setFrameHeight(document.documentElement.scrollHeight + 5);
-    }
-
-    function onRender(event) {
-      const args = event.detail.args;
-      // Python側から「新しい牛になった」合図が来たらバッファをリセット
-      if (renderKey !== args.render_key) {
-        renderKey = args.render_key;
-        mode = args.mode;
-        cowNo = args.cow_no;
-        weightBuf = args.weight_val;
-        priceBuf = args.price_val;
-        buyerBuf = args.buyer_val;
-        activeInput = "price";
-      }
-      renderUI();
-    }
-
-    Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
-    Streamlit.setComponentReady();
-  </script>
-</body>
-</html>
-"""
-
-# V1 の declare_component は iframe 用アセット URL を別途読み込む。プロキシ配下で
-# その URL が失敗するため、HTML / CSS / JS をアプリ本文に直接マウントする V2 を使う。
 NUMPAD_HTML = '<div id="numpad-app"></div>'
 NUMPAD_CSS = """
 #numpad-app { padding-top: 4px; font-family: sans-serif; user-select: none; -webkit-user-select: none; }
@@ -1382,9 +1182,7 @@ with tab2:
   res_w = custom_numpad(
       key=f"numpad_w_{idx}_{st.session_state.reset_ver}",
       data={"mode": "weight", "render_key": f"w_{idx}_{st.session_state.reset_ver}", "weight_val": str(cow["体重"]).replace(".0", "") if cow["体重"] > 0 else "", "price_val": "", "buyer_val": ""},
-      # 体重用も価格用と同じ余裕のある高さにし、コンポーネント内スクロールをなくす。
       height=415,
-      on_submit_change=lambda: None,
   )
   
   action_w = getattr(res_w, "submit", None)
@@ -1500,7 +1298,6 @@ with tab3:
       key=f"numpad_p_{idx}_{st.session_state.reset_ver}",
       data={"mode": "price", "render_key": f"p_{idx}_{st.session_state.reset_ver}", "weight_val": "", "price_val": str(cow["実際落札額"]) if cow["実際落札額"] > 0 else "", "buyer_val": cow.get("落札者番号", "")},
       height=415,
-      on_submit_change=lambda: None,
   )
 
   action_p = getattr(res_p, "submit", None)
@@ -1552,19 +1349,29 @@ with tab4:
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
     import altair as alt
 
-    # 固定の縦軸範囲を設けず、平均は緑の水平点線で重ねる。
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
-        x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
-        y=alt.Y("kg単価(円):Q", title="kg単価（円）", scale=alt.Scale(domain=[1500, 3500])),
-        tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
+        x=alt.X('出場番号:N', sort=df_g['出場番号'].tolist(), title='出場番号'),
+        y=alt.Y(
+            'kg単価(円):Q',
+            scale=alt.Scale(domain=[1500, 3500], zero=False),
+            title='kg単価 (円)'
+        ),
+        tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")]
     )
-    average_rule = alt.Chart(pd.DataFrame({"平均kg単価": [avg_kp]})).mark_rule(
-        color="#16a34a", strokeDash=[6, 4], strokeWidth=3
-    ).encode(y=alt.Y("平均kg単価:Q", scale=alt.Scale(domain=[1500, 3500])))
-    st.altair_chart(
-        alt.layer(line_chart, average_rule).properties(height=300),
-        use_container_width=True,
+
+    rule_chart = alt.Chart(pd.DataFrame({'y': [avg_kp]})).mark_rule(
+        color='#16a34a',
+        strokeDash=[6, 4],
+        strokeWidth=3
+    ).encode(
+        y='y:Q'
     )
+
+    chart = alt.layer(line_chart, rule_chart).properties(
+        height=300
+    )
+
+    st.altair_chart(chart, use_container_width=True)
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
