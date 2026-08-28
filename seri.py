@@ -1,6 +1,7 @@
 import json
 import os
 import textwrap
+import uuid
 from google import genai
 from google.genai import types
 import numpy as np
@@ -403,7 +404,11 @@ NEGATIVE_FACTORS = [
 ]
 
 # --- 自動バックアップ管理 ---
-BACKUP_FILE = "backup_cows.json"
+# 端末(セッション)ごとに別ファイルにすることで、複数人が同時に使っても
+# 他人のバックアップで上書き・復元されないようにする
+if "session_id" not in st.session_state:
+  st.session_state.session_id = uuid.uuid4().hex[:8]
+BACKUP_FILE = f"backup_cows_{st.session_state.session_id}.json"
 
 
 def save_backup():
