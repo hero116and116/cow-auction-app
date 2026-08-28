@@ -1,7 +1,6 @@
 import json
 import os
 import textwrap
-import uuid
 from google import genai
 from google.genai import types
 import numpy as np
@@ -404,18 +403,7 @@ NEGATIVE_FACTORS = [
 ]
 
 # --- 自動バックアップ管理 ---
-# 端末(タブ)ごとに別ファイルにすることで、複数人が同時に使っても
-# 他人のバックアップで上書き・復元されないようにする。
-# タスク切り替え等でセッションが切れて再接続されても同じファイルに
-# 戻れるよう、IDはsession_stateではなくURLのクエリパラメータに保持する。
-if "session_id" not in st.session_state:
-  qp = st.query_params
-  if "sid" in qp:
-    st.session_state.session_id = qp["sid"]
-  else:
-    st.session_state.session_id = uuid.uuid4().hex[:8]
-    st.query_params["sid"] = st.session_state.session_id
-BACKUP_FILE = f"backup_cows_{st.session_state.session_id}.json"
+BACKUP_FILE = "backup_cows.json"
 
 
 def save_backup():
