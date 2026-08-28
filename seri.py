@@ -1552,27 +1552,30 @@ with tab4:
     avg_kp = int(round(df_g["kg単価(円)"].mean()))
     import altair as alt
 
-    # ① 折れ線グラフ：Y軸に 1500〜3500 の固定スケールを設定
+    # 🔴 修正点: 2つのグラフで設定が衝突しないよう、Y軸のルールを1つの変数にまとめます
+    shared_y = alt.Y(
+        "kg単価(円):Q", 
+        title="kg単価（円）", 
+        scale=alt.Scale(domain=[1500, 3500], clamp=True) # clamp=Trueで範囲外の点もエラーを出さずに枠の上下に留める
+    )
+
+    # 折れ線グラフ
     line_chart = alt.Chart(df_g).mark_line(point=True).encode(
         x=alt.X("出場番号:N", sort=df_g["出場番号"].tolist(), title="出場番号"),
-        y=alt.Y(
-            "kg単価(円):Q", 
-            title="kg単価（円）", 
-            scale=alt.Scale(domain=[1500, 3500])
-        ),
-        tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")],
+        y=shared_y, # 共通ルールを適用
+        tooltip=["出場番号:N", alt.Tooltip("kg単価(円):Q", format=",")]
     )
 
-    # ② 平均線：「平均kg単価」という名前をやめ、親グラフと同じ「kg単価(円)」に統一する
+    # 平均線
     average_rule = alt.Chart(pd.DataFrame({"kg単価(円)": [avg_kp]})).mark_rule(
         color="#16a34a", strokeDash=[6, 4], strokeWidth=3
-    ).encode(y="kg単価(円):Q")
-
-    # 重ね合わせて描画
-    st.altair_chart(
-        alt.layer(line_chart, average_rule).properties(height=300),
-        use_container_width=True,
+    ).encode(
+        y=shared_y # 折れ線グラフと全く同じ共通ルールを適用
     )
+
+    # グラフを重ね合わせて描画
+    chart = alt.layer(line_chart, average_rule).properties(height=300)
+    st.altair_chart(chart, use_container_width=True)
     
     min_kp = df_g["kg単価(円)"].min()
     max_kp = df_g["kg単価(円)"].max()
